@@ -26,6 +26,17 @@ class ReadinessResponse(BaseModel):
     checks: dict[str, CheckStatus]
 
 
+class RootResponse(BaseModel):
+    name: str
+    version: str
+    health: str
+
+
+@router.get("/")
+def root() -> RootResponse:
+    return RootResponse(name="CoachIA API", version=__version__, health="/health")
+
+
 @router.get("/health")
 def health() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__)
