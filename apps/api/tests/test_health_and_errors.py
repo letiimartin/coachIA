@@ -7,6 +7,13 @@ from app.main import create_app
 from tests.conftest import FERNET_KEY, make_settings
 
 
+def test_root_describes_the_api(client: TestClient) -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json() == {"name": "CoachIA API", "version": __version__, "health": "/health"}
+
+
 def test_health(client: TestClient) -> None:
     response = client.get("/health")
 
