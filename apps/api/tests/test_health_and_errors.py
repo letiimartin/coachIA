@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app import __version__
 from app.db.session import Database
 from app.main import create_app
-from tests.conftest import make_settings
+from tests.conftest import FERNET_KEY, make_settings
 
 
 def test_health(client: TestClient) -> None:
@@ -76,7 +76,10 @@ def test_unhandled_exception_does_not_leak_details(app: FastAPI) -> None:
 
 def test_docs_are_disabled_in_production() -> None:
     settings = make_settings(
-        environment="production", database_url="postgresql://u:p@localhost:5432/db"
+        environment="production",
+        database_url="postgresql://u:p@localhost:5432/db",
+        token_encryption_key=FERNET_KEY,
+        oauth_state_secret="state-secret",
     )
     app = create_app(settings, database=Database(None))
 

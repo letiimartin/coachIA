@@ -35,6 +35,22 @@ class Settings(BaseSettings):
 
     strava_verify_token: SecretStr | None = None
 
+    # Cifrado de tokens OAuth en BD (clave Fernet: `uv run python -m app.core.crypto`).
+    token_encryption_key: SecretStr | None = None
+    # Firma del parámetro `state` de OAuth (cualquier cadena aleatoria larga).
+    oauth_state_secret: SecretStr | None = None
+
+    # Wahoo Cloud API. La redirect URI debe coincidir con una de las registradas en Wahoo.
+    wahoo_client_id: str | None = None
+    wahoo_client_secret: SecretStr | None = None
+    wahoo_redirect_uri: str = "https://letismartcoach.onrender.com/auth/wahoo/callback"
+    wahoo_api_base_url: str = "https://api.wahooligan.com"
+    wahoo_scopes: str = "user_read workouts_read workouts_write plans_read plans_write"
+
+    # A dónde vuelve el usuario tras conectar una integración.
+    app_return_url_mobile: str = "letismartcoach://integrations"
+    app_return_url_web: str | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -63,12 +79,27 @@ class Settings(BaseSettings):
         if self.environment == "production":
             missing = [
                 name
-                for name in ("database_url", "supabase_url", "internal_api_key")
+                for name in (
+                    "database_url",
+                    "supabase_url",
+                    "internal_api_key",
+                    "token_encryption_key",
+                    "oauth_state_secret",
+                )
                 if getattr(self, name) is None
             ]
             if missing:
                 raise ValueError(f"Faltan variables obligatorias en producción: {missing}")
         return self
+
+    @property
+    def wahoo_configured(self) -> bool:
+        return bool(
+            self.wahoo_client_id
+            and self.wahoo_client_secret
+            and self.token_encryption_key
+            and self.oauth_state_secret
+        )
 
     @property
     def supabase_issuer(self) -> str | None:

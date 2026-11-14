@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "httpx>=0.27",
     "pyjwt[crypto]>=2.9",
+    "cryptography>=43",
 ]
 
 [dependency-groups]
@@ -38,6 +39,8 @@ select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]
+# Las migraciones construyen DDL con constantes del propio fichero, no con entrada de usuario.
+"alembic/versions/**" = ["S608"]
 
 [tool.mypy]
 python_version = "3.12"

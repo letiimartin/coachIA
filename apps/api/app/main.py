@@ -6,6 +6,7 @@ Arranque local:  uv run uvicorn app.main:app --reload
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,17 +14,23 @@ from app import __version__
 from app.api import health, internal
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
+from app.core.crypto import TokenCipher
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, request_context_middleware
+from app.core.oauth_state import OAuthStateSigner
 from app.core.security import TokenVerifier
 from app.db.session import Database
 from app.integrations.strava.router import router as strava_router
+from app.integrations.wahoo.client import WahooClient
+from app.integrations.wahoo.router import router as wahoo_router
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     app.state.database.dispose()
+    if app.state.wahoo_client is not None:
+        app.state.wahoo_client.close()
 
 
 def create_app(
@@ -31,6 +38,7 @@ def create_app(
     *,
     token_verifier: TokenVerifier | None = None,
     database: Database | None = None,
+    wahoo_client: WahooClient | None = None,
 ) -> FastAPI:
     """Crea la aplicación. Los parámetros permiten inyectar dependencias en los tests."""
     settings = settings or get_settings()
@@ -48,6 +56,19 @@ def create_app(
     app.state.settings = settings
     app.state.token_verifier = token_verifier or TokenVerifier(settings)
     app.state.database = database or Database.from_settings(settings)
+    app.state.token_cipher = (
+        TokenCipher(settings.token_encryption_key.get_secret_value())
+        if settings.token_encryption_key
+        else None
+    )
+    app.state.state_signer = (
+        OAuthStateSigner(settings.oauth_state_secret.get_secret_value())
+        if settings.oauth_state_secret
+        else None
+    )
+    if wahoo_client is None and settings.wahoo_configured:
+        wahoo_client = WahooClient(settings, httpx.Client())
+    app.state.wahoo_client = wahoo_client
 
     if settings.cors_origins:
         app.add_middleware(
@@ -64,6 +85,7 @@ def create_app(
     app.include_router(api_v1_router)
     app.include_router(internal.router)
     app.include_router(strava_router)
+    app.include_router(wahoo_router)
     return app
 
 
