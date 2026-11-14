@@ -1,0 +1,187 @@
+import { supabase } from '../lib/supabase';
+
+export const calendarService = {
+    /**
+     * Fetch both calendar events and planned sessions (workouts) for the user.
+     */
+    async getEvents() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
+
+            // Fetch generic events, planned sessions, and executed workouts in parallel
+            const [eventsRes, sessionsRes, workoutsRes] = await Promise.all([
+                supabase
+                    .from('calendar_events')
+                    .select('*')
+                    .eq('user_id', user.id),
+                supabase
+                    .from('planned_sessions')
+                    .select('*')
+                    .eq('user_id', user.id),
+                supabase
+                    .from('workouts')
+                    .select('*')
+                    .eq('user_id', user.id)
+            ]);
+
+            if (eventsRes.error) throw eventsRes.error;
+            if (sessionsRes.error) throw sessionsRes.error;
+            if (workoutsRes.error) throw workoutsRes.error;
+
+            // Map generic events
+            const mappedEvents = eventsRes.data.map(e => ({
+                id: e.id,
+                title: e.title,
+                date: e.start_dt.split('T')[0],
+                start_dt: e.start_dt,
+                end_dt: e.end_dt,
+                type: e.type, // 'race', 'social', 'health', 'personal'
+                description: e.details_json?.description || '',
+                priority: e.priority || 'medium',
+                restriction: e.constraints_json?.is_restriction || false
+            }));
+
+            // Map planned sessions
+            const mappedPlanned = sessionsRes.data.map(s => ({
+                id: s.id,
+                title: `${s.sport.toUpperCase()}: ${s.targets_json?.main_goal || 'Planificado'}`,
+                date: s.date,
+                type: 'workout',
+                sport: s.sport,
+                duration: s.duration_s ? `${Math.round(s.duration_s / 60)} min` : '--',
+                description: s.structure_json?.notes || '',
+                status: 'planificado', // Explicitly plan
+                export_status: s.export_status
+            }));
+
+            // Map executed workouts (Real)
+            const mappedExecuted = workoutsRes.data.map(w => ({
+                id: w.id,
+                title: w.title || 'Entreno Realizado',
+                date: w.start_dt.split('T')[0],
+                type: 'workout',
+                sport: w.sport,
+                duration: w.duration_s ? `${Math.round(w.duration_s / 60)} min` : '--',
+                description: w.notes || '',
+                status: 'hecho' // Explicitly done
+            }));
+
+            return [...mappedEvents, ...mappedPlanned, ...mappedExecuted];
+
+            return [...mappedEvents, ...mappedPlanned, ...mappedExecuted];
+        } catch (error) {
+            console.error("Error fetching calendar:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Add a new generic calendar event.
+     */
+    async addEvent(event) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("No hay sesión activa");
+
+            const { data, error } = await supabase
+                .from('calendar_events')
+                .insert([{
+                    user_id: user.id,
+                    type: event.type,
+                    title: event.title,
+                    start_dt: event.start_dt || new Date().toISOString(),
+                    details_json: { description: event.description }
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Map to UI format before returning
+            return {
+                id: data.id,
+                title: data.title,
+                date: data.start_dt.split('T')[0],
+                start_dt: data.start_dt,
+                end_dt: data.end_dt,
+                type: data.type,
+                description: data.details_json?.description || '',
+                priority: data.priority || 'medium',
+                restriction: data.constraints_json?.is_restriction || false
+            };
+        } catch (error) {
+            console.error("Error adding event:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update an existing generic event.
+     */
+    async updateEvent(id, updates) {
+        try {
+            const { data, error } = await supabase
+                .from('calendar_events')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error("Error updating event:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete an event.
+     */
+    async deleteEvent(id) {
+        try {
+            const { error } = await supabase
+                .from('calendar_events')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error("Error deleting event:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update the status of a planned session (workout).
+     */
+    async updateStatus(id, status) {
+        try {
+            const { error } = await supabase
+                .from('planned_sessions')
+                .update({ export_status: status }) // MVP uses export_status for the UI badge
+                .eq('id', id);
+
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error("Error updating status:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Placeholder for weekly summary.
+     */
+    async getWeeklySummary(startDate) {
+        return {
+            sessions: 0,
+            hours: "0h",
+            tss: 0,
+            restrictions: 0,
+            keyRace: "No racing info"
+        };
+    }
+};

@@ -1,0 +1,41 @@
+# Secretos y entorno local
+.env
+.env.*
+!.env.example
+tokens.json
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Expo
+node_modules/
+.expo/
+
+# Supabase CLI
+supabase/.temp/
+**/supabase/.temp/
+
+# Editores y SO
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+expo_log.txt
+
+# Artefactos de herramientas de IA y documentos privados de trabajo
+.agent/
+*.docx
+*.docx.md
+
+# Datos de usuario (ficheros FIT, exportaciones)
+data/inbox/*
+!data/inbox/.gitkeep
