@@ -8,7 +8,7 @@ Es la evolución de **LetiSmartCoach**. Este repositorio arranca con una histori
 
 ```
 apps/
-  api/        Backend FastAPI (núcleo nuevo: métricas, integraciones, coach). En construcción (T2)
+  api/        Backend FastAPI (núcleo nuevo: métricas, integraciones, coach). Ver apps/api/README.md
   mobile/     App Expo / React Native (iOS, Android y web)
 legacy/
   render-backend/  FastAPI desplegado en Render: hoy sólo sirve el callback OAuth de Wahoo
@@ -24,6 +24,12 @@ App móvil (antes, copia las variables `EXPO_PUBLIC_*` de `.env.example` a `apps
 
 ```bash
 cd apps/mobile && npm install && npx expo start
+```
+
+API nueva:
+
+```bash
+cd apps/api && uv sync && uv run uvicorn app.main:app --reload
 ```
 
 Backend legacy (callback de Wahoo):
