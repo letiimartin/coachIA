@@ -49,3 +49,10 @@ uv run alembic revision --autogenerate -m "descripcion"   # requiere DATABASE_UR
 uv run alembic upgrade head                               # aplicar (online)
 uv run alembic upgrade head --sql > migracion.sql         # generar SQL sin conectarse (offline)
 ```
+
+## Esquema v1 (núcleo)
+Tablas: `athlete_profiles` (1:1 con `auth.users`), `athlete_thresholds` (umbrales con fecha de vigencia), `availability_slots`, `integrations`, `activities`, `calendar_events` y `races`. Las zonas no se guardan: se calculan a partir del umbral vigente.
+
+- RLS está activado en todas las tablas y sin políticas, así que el Data API de Supabase no las expone. La API se conecta como propietaria.
+- Tests de integración: `TEST_DATABASE_URL=postgresql://... uv run pytest`. Usa una BD **desechable**: el test borra los esquemas `public` y `auth`.
+- Aplicar en Supabase sin conexión directa: `uv run alembic upgrade head --sql`, y el SQL se ejecuta con la Management API.

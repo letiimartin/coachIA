@@ -24,6 +24,17 @@ target_metadata = Base.metadata
 OFFLINE_FALLBACK_URL = "postgresql+psycopg://offline"
 
 
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    """Ignora las FK hacia el esquema auth de Supabase: no forman parte de nuestros modelos."""
+    if type_ == "foreign_key_constraint":
+        referred = getattr(obj, "referred_table", None)
+        if getattr(referred, "schema", None) == "auth":
+            return False
+    return True
+
+
 def _database_url() -> str | None:
     settings = Settings()
     return settings.database_url.get_secret_value() if settings.database_url else None
@@ -36,6 +47,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -49,7 +61,12 @@ def run_migrations_online() -> None:
     section["sqlalchemy.url"] = url
     connectable = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_object=include_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
