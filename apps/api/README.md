@@ -25,6 +25,20 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy
 ```
 
+### Postgres local para los tests de BD
+Sin `TEST_DATABASE_URL`, los tests de BD se omiten. `scripts/test-db.sh` levanta un Postgres desechable
+(binarios locales, sin Docker) en `localhost:5433` con la BD `coachia_test` e imprime la variable:
+
+```bash
+eval "$(scripts/test-db.sh)"   # idempotente: si ya está en marcha, sólo vuelve a imprimir la URL
+uv run pytest                  # ahora incluye los tests de BD
+scripts/test-db.sh stop        # pararlo
+```
+
+Busca los binarios en `/usr/lib/postgresql/*/bin` o en el `PATH` (o en `PG_BIN`). Si se ejecuta como root,
+usa el usuario `postgres`. El clúster vive en `${TMPDIR:-/tmp}/coachia-test-db` (`TEST_DB_DIR`); el puerto
+se cambia con `TEST_DB_PORT`. Para empezar de cero, páralo y borra ese directorio.
+
 ## Endpoints actuales
 
 | Ruta | Auth | Descripción |
