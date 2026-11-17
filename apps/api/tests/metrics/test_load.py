@@ -6,6 +6,7 @@ from app.metrics.load import (
     LoadResult,
     activity_load,
     hr_tss,
+    intensity_factor_for,
     pace_s_per_km,
     power_tss,
     run_tss,
@@ -15,8 +16,8 @@ from app.models import LoadMethod
 
 def test_one_hour_at_threshold_is_100() -> None:
     assert power_tss(3600, 250, 250) == LoadResult(100.0, LoadMethod.POWER, 1.0)
-    assert hr_tss(3600, 165, 165) == LoadResult(100.0, LoadMethod.HEART_RATE, 1.0)
-    assert run_tss(3600, 240, 240) == LoadResult(100.0, LoadMethod.PACE, 1.0)
+    assert hr_tss(3600, 165, 165) == LoadResult(100.0, LoadMethod.HEART_RATE, None)
+    assert run_tss(3600, 240, 240) == LoadResult(100.0, LoadMethod.PACE, None)
 
 
 def test_power_tss_known_value() -> None:
@@ -50,21 +51,27 @@ def test_run_tss_known_value() -> None:
     result = run_tss(3600, 300, 270)
     assert result is not None
     assert result.load == pytest.approx(81.0)
-    assert result.intensity_factor == pytest.approx(0.9)
+    assert result.intensity_factor is None  # De momento el IF sólo se publica con potencia.
     assert result.method is LoadMethod.PACE
 
 
-def test_faster_than_threshold_pace_gives_if_above_one() -> None:
-    result = run_tss(1800, 240, 270)
+def test_faster_than_threshold_pace_counts_more_than_an_hour_at_threshold() -> None:
+    result = run_tss(3600, 240, 270)
     assert result is not None
-    assert result.intensity_factor == pytest.approx(1.125)
+    assert result.load == pytest.approx(1.125**2 * 100)
+
+
+def test_intensity_factor_is_published_per_method() -> None:
+    assert intensity_factor_for(LoadMethod.POWER, 0.85) == pytest.approx(0.85)
+    for method in (LoadMethod.HEART_RATE, LoadMethod.PACE, LoadMethod.RPE):
+        assert intensity_factor_for(method, 0.85) is None
 
 
 def test_zero_duration_gives_zero_load() -> None:
     result = power_tss(0, 200, 250)
     assert result == LoadResult(0.0, LoadMethod.POWER, pytest.approx(0.8))
     assert activity_load(0, avg_hr_bpm=150, lthr_bpm=170) == LoadResult(
-        0.0, LoadMethod.HEART_RATE, pytest.approx(150 / 170)
+        0.0, LoadMethod.HEART_RATE, None
     )
 
 
@@ -117,7 +124,7 @@ def test_best_method_prefers_power_then_hr_then_pace() -> None:
     no_hr = {**no_ftp, "avg_hr_bpm": None}
     result = activity_load(3600, **no_hr)
     assert result is not None and result.method is LoadMethod.PACE
-    assert result.intensity_factor == pytest.approx(270 / (1000 / 3.5))
+    assert result.load == pytest.approx((270 / (1000 / 3.5)) ** 2 * 100)
 
 
 def test_best_method_none_available() -> None:

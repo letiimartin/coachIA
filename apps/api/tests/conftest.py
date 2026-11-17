@@ -61,6 +61,9 @@ def make_settings(**overrides: Any) -> Settings:
         "wahoo_client_id": "wahoo-client-id",
         "wahoo_client_secret": "wahoo-client-secret",
         "wahoo_api_base_url": "https://wahoo.test",
+        # Explícito: el fixture alembic_config exporta DATABASE_URL durante toda la sesión y,
+        # sin esto, las apps de los tests sin BD acabarían conectadas según el orden de ejecución.
+        "database_url": None,
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

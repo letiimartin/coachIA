@@ -17,13 +17,18 @@ al umbral vale 100. Lo que cambia entre métodos es cómo se obtiene ``IF``:
   pendiente (NGP), que necesita los streams del FIT; con el ritmo medio, el desnivel
   (trail) queda infravalorado.
 
-El factor de intensidad devuelto es el usado en la fórmula, sea cual sea el método.
+El factor de intensidad (IF) que se publica va por método: de momento sólo se publica con
+potencia (``NP / FTP``, el IF de Coggan). Con FC y ritmo el cociente se usa en la fórmula pero
+el IF devuelto es ``None``, porque es una aproximación que no equivale al IF de potencia. Para
+publicarlo con otro método basta con añadirlo a ``INTENSITY_FACTOR_METHODS`` (o darle su propio
+cálculo en ``intensity_factor_for``) sin tocar el resto.
 
 Las funciones devuelven ``None`` cuando falta el dato o el umbral (o no es positivo): no se
 inventa carga. Una duración de 0 da carga 0. Valores negativos o no finitos son un error.
 """
 
 import math
+from collections.abc import Callable, Mapping
 from typing import NamedTuple, TypeGuard
 
 from app.models.activity import LoadMethod
@@ -32,11 +37,27 @@ SECONDS_PER_HOUR = 3600.0
 
 
 class LoadResult(NamedTuple):
-    """Resultado del contrato con el sync: ``(load, method, intensity_factor)``."""
+    """Resultado del contrato con el sync: ``(load, method, intensity_factor)``.
+
+    ``intensity_factor`` es ``None`` si el método no publica IF (ver ``intensity_factor_for``).
+    """
 
     load: float
     method: LoadMethod
     intensity_factor: float | None
+
+
+# Cálculo del IF publicado por método. Recibe el cociente de intensidad usado en el TSS.
+# Un método sin entrada aquí no publica IF.
+INTENSITY_FACTOR_METHODS: Mapping[LoadMethod, Callable[[float], float]] = {
+    LoadMethod.POWER: lambda ratio: ratio,
+}
+
+
+def intensity_factor_for(method: LoadMethod, ratio: float) -> float | None:
+    """IF publicado para ``method`` a partir del cociente de intensidad; ``None`` si no hay."""
+    compute = INTENSITY_FACTOR_METHODS.get(method)
+    return compute(ratio) if compute is not None else None
 
 
 def _check_duration(duration_s: float) -> None:
@@ -53,9 +74,9 @@ def _usable(value: float | None) -> TypeGuard[float]:
     return value > 0
 
 
-def _tss(duration_s: float, intensity_factor: float, method: LoadMethod) -> LoadResult:
-    load = duration_s / SECONDS_PER_HOUR * intensity_factor**2 * 100.0
-    return LoadResult(load, method, intensity_factor)
+def _tss(duration_s: float, ratio: float, method: LoadMethod) -> LoadResult:
+    load = duration_s / SECONDS_PER_HOUR * ratio**2 * 100.0
+    return LoadResult(load, method, intensity_factor_for(method, ratio))
 
 
 def power_tss(duration_s: float, np_w: float | None, ftp_w: float | None) -> LoadResult | None:

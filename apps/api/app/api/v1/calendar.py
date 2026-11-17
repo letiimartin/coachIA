@@ -1,6 +1,6 @@
 """Calendario del atleta: carreras, viajes, salud, eventos sociales y no disponibilidad.
 
-Contrato (#10): los endpoints están declarados y validan la entrada, pero aún responden 501.
+Todo se filtra por el atleta del JWT: un evento de otro atleta responde 404. Contrato: #10.
 """
 
 from typing import Annotated
@@ -8,8 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Response, status
 
-from app.api.deps import CurrentUser
-from app.core.errors import NotImplementedApiError
+from app.api.deps import CurrentUser, DbSession
 from app.schemas.calendar import (
     CalendarEventCreate,
     CalendarEventOut,
@@ -17,27 +16,30 @@ from app.schemas.calendar import (
     CalendarRange,
 )
 from app.schemas.common import error_responses
+from app.services import calendar as calendar_service
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
 @router.get("/events", responses=error_responses())
 def list_events(
-    user: CurrentUser, date_range: Annotated[CalendarRange, Query()]
+    user: CurrentUser, db: DbSession, date_range: Annotated[CalendarRange, Query()]
 ) -> list[CalendarEventOut]:
     """Eventos que se solapan con el rango `[from, to]`, ordenados por `start_at`. Sin paginar."""
-    raise NotImplementedApiError()
+    return calendar_service.list_events(db, user.id, date_range.from_, date_range.to)
 
 
 @router.post("/events", status_code=status.HTTP_201_CREATED, responses=error_responses())
-def create_event(user: CurrentUser, body: CalendarEventCreate) -> CalendarEventOut:
-    raise NotImplementedApiError()
+def create_event(user: CurrentUser, db: DbSession, body: CalendarEventCreate) -> CalendarEventOut:
+    return calendar_service.create_event(db, user.id, body)
 
 
 @router.patch("/events/{event_id}", responses=error_responses(404, 409))
-def update_event(user: CurrentUser, event_id: UUID, body: CalendarEventPatch) -> CalendarEventOut:
+def update_event(
+    user: CurrentUser, db: DbSession, event_id: UUID, body: CalendarEventPatch
+) -> CalendarEventOut:
     """Actualiza sólo los campos enviados. 409 si el evento resultante no es coherente."""
-    raise NotImplementedApiError()
+    return calendar_service.update_event(db, user.id, event_id, body)
 
 
 @router.delete(
@@ -46,6 +48,6 @@ def update_event(user: CurrentUser, event_id: UUID, body: CalendarEventPatch) ->
     response_class=Response,
     responses=error_responses(404),
 )
-def delete_event(user: CurrentUser, event_id: UUID) -> None:
+def delete_event(user: CurrentUser, db: DbSession, event_id: UUID) -> None:
     """Borra el evento (y sus datos de carrera, si los tiene)."""
-    raise NotImplementedApiError()
+    calendar_service.delete_event(db, user.id, event_id)

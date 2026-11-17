@@ -69,7 +69,7 @@ uv run alembic upgrade head --sql > migracion.sql         # generar SQL sin cone
 ```
 
 ## Esquema v1 (núcleo)
-Tablas: `athlete_profiles` (1:1 con `auth.users`), `athlete_thresholds` (umbrales con fecha de vigencia), `availability_slots`, `integrations`, `activities`, `calendar_events` y `races`. Las zonas no se guardan: se calculan a partir del umbral vigente.
+Tablas: `athlete_profiles` (1:1 con `auth.users`), `athlete_thresholds` (umbrales con fecha de vigencia), `availability_slots`, `integrations`, `activities`, `calendar_events`, `races` y `daily_load` (carga diaria y CTL/ATL/TSB, derivada: la regenera `services.fitness.recompute_from`). Las zonas no se guardan: se calculan a partir del umbral vigente.
 
 - RLS está activado en todas las tablas y sin políticas, así que el Data API de Supabase no las expone. La API se conecta como propietaria.
 - Tests de integración: `TEST_DATABASE_URL=postgresql://... uv run pytest`. Usa una BD **desechable**: el test borra los esquemas `public` y `auth`.

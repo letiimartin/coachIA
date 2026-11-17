@@ -677,6 +677,102 @@
         "title": "EventKind",
         "type": "string"
       },
+      "FitnessDayOut": {
+        "description": "Un día de la serie. Valores redondeados a 1 decimal.\n\n- `load`: carga total del día (suma del TSS/hrTSS/rTSS de sus actividades, sin duplicados).\n- `ctl`: forma física (media exponencial de 42 días) al final del día.\n- `atl`: fatiga (media exponencial de 7 días) al final del día.\n- `tsb`: frescura con la que se empieza el día: CTL − ATL **del día anterior**\n  (criterio de TrainingPeaks).",
+        "properties": {
+          "atl": {
+            "minimum": 0.0,
+            "title": "Atl",
+            "type": "number"
+          },
+          "ctl": {
+            "minimum": 0.0,
+            "title": "Ctl",
+            "type": "number"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "load": {
+            "minimum": 0.0,
+            "title": "Load",
+            "type": "number"
+          },
+          "tsb": {
+            "title": "Tsb",
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "load",
+          "ctl",
+          "atl",
+          "tsb"
+        ],
+        "title": "FitnessDayOut",
+        "type": "object"
+      },
+      "FitnessSeriesOut": {
+        "description": "Serie diaria continua (un elemento por día del rango, ordenada por fecha).\n\nAntes de la primera actividad todo vale 0. Los días sin actividad tienen `load` 0, y los\ndías posteriores al último recálculo continúan la serie como descanso.",
+        "examples": [
+          {
+            "days": [
+              {
+                "atl": 62.9,
+                "ctl": 55.6,
+                "day": "2026-11-10",
+                "load": 80.0,
+                "tsb": -5.0
+              },
+              {
+                "atl": 53.9,
+                "ctl": 54.3,
+                "day": "2026-11-11",
+                "load": 0.0,
+                "tsb": -7.3
+              },
+              {
+                "atl": 63.3,
+                "ctl": 55.8,
+                "day": "2026-11-12",
+                "load": 120.0,
+                "tsb": 0.4
+              }
+            ],
+            "from": "2026-11-10",
+            "to": "2026-11-12"
+          }
+        ],
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/FitnessDayOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "days"
+        ],
+        "title": "FitnessSeriesOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2456,6 +2552,89 @@
         "summary": "Replace Availability",
         "tags": [
           "athlete"
+        ]
+      }
+    },
+    "/v1/athlete/fitness": {
+      "get": {
+        "description": "Carga diaria y CTL/ATL/TSB de cada día del rango `[from, to]` (máximo 366 días).",
+        "operationId": "get_fitness_series_v1_athlete_fitness_get",
+        "parameters": [
+          {
+            "description": "Primer día del rango (incluido).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "Primer día del rango (incluido).",
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Último día del rango (incluido).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "Último día del rango (incluido).",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FitnessSeriesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Fitness Series",
+        "tags": [
+          "fitness"
         ]
       }
     },

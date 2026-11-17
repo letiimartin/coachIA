@@ -4,6 +4,7 @@ from app.models.activity import Activity, ActivitySource, LoadMethod
 from app.models.athlete import AthleteProfile, AthleteThreshold, AvailabilitySlot
 from app.models.calendar import CalendarEvent, EventKind, Race, RacePriority, TrainingImpact
 from app.models.common import Sport
+from app.models.fitness import DailyLoad
 from app.models.integration import Integration, IntegrationStatus, Provider
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "AthleteThreshold",
     "AvailabilitySlot",
     "CalendarEvent",
+    "DailyLoad",
     "EventKind",
     "Integration",
     "IntegrationStatus",
