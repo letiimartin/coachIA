@@ -15,8 +15,13 @@ import { WorkoutsProvider } from './src/context/WorkoutsContext';
 import AuthScreen from './src/screens/AuthScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import WorkoutsScreen from './src/screens/WorkoutsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import CalendarScreen from './src/screens/CalendarScreen';
+// Pantallas nuevas (TypeScript) contra la API de CoachIA (#18).
+import AthleteProfileScreen from './src/screens/athlete/AthleteProfileScreen';
+import ThresholdsScreen from './src/screens/athlete/ThresholdsScreen';
+import ThresholdFormScreen from './src/screens/athlete/ThresholdFormScreen';
+import AvailabilityScreen from './src/screens/athlete/AvailabilityScreen';
+import EventsScreen from './src/screens/calendar/EventsScreen';
+import EventFormScreen from './src/screens/calendar/EventFormScreen';
 import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen';
 import CoachChatScreen from './src/screens/CoachChatScreen';
 import WahooCallbackScreen from './src/screens/WahooCallbackScreen';
@@ -40,6 +45,8 @@ const linking = {
           Perfil: 'profile',
         },
       },
+      Thresholds: 'profile/thresholds',
+      Availability: 'profile/availability',
       WorkoutDetail: 'workout/:id',
       CoachChat: 'chat',
       WahooCallback: 'wahoo-callback',
@@ -70,9 +77,9 @@ function TabNavigator({ onLogout }) {
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Entrenos" component={WorkoutsScreen} />
-      <Tab.Screen name="Calendario" component={CalendarScreen} />
+      <Tab.Screen name="Calendario" component={EventsScreen} />
       <Tab.Screen name="Perfil">
-        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+        {(props) => <AthleteProfileScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -125,6 +132,10 @@ export default function App() {
               <Stack.Screen name="MainTabs">
                 {(props) => <TabNavigator {...props} onLogout={() => supabase.auth.signOut()} />}
               </Stack.Screen>
+              <Stack.Screen name="Thresholds" component={ThresholdsScreen} />
+              <Stack.Screen name="ThresholdForm" component={ThresholdFormScreen} />
+              <Stack.Screen name="Availability" component={AvailabilityScreen} />
+              <Stack.Screen name="EventForm" component={EventFormScreen} />
               <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
               <Stack.Screen name="CoachChat" component={CoachChatScreen} />
               <Stack.Screen name="WahooCallback" component={WahooCallbackScreen} />
