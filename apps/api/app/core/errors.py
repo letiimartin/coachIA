@@ -49,6 +49,24 @@ class NotFoundError(AppError):
     message = "Recurso no encontrado."
 
 
+class ConflictError(AppError):
+    status_code = 409
+    code = "conflict"
+    message = "La operación no es posible en el estado actual."
+
+
+class TooManyRequestsError(AppError):
+    status_code = 429
+    code = "too_many_requests"
+    message = "Demasiadas peticiones. Inténtalo más tarde."
+
+
+class BadGatewayError(AppError):
+    status_code = 502
+    code = "bad_gateway"
+    message = "Un servicio externo no ha respondido correctamente."
+
+
 class ServiceUnavailableError(AppError):
     status_code = 503
     code = "service_unavailable"

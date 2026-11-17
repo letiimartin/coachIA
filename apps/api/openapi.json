@@ -124,6 +124,50 @@
         "title": "IntegrationStatus",
         "type": "string"
       },
+      "InternalSyncOut": {
+        "description": "Resultado agregado de sincronizar todas las integraciones activas.",
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "integrations": {
+            "title": "Integrations",
+            "type": "integer"
+          },
+          "rate_limited": {
+            "title": "Rate Limited",
+            "type": "boolean"
+          },
+          "succeeded": {
+            "title": "Succeeded",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "integrations",
+          "succeeded",
+          "failed",
+          "rate_limited",
+          "created",
+          "updated",
+          "unchanged"
+        ],
+        "title": "InternalSyncOut",
+        "type": "object"
+      },
       "MeResponse": {
         "properties": {
           "email": {
@@ -290,6 +334,30 @@
           "event_time"
         ],
         "title": "StravaEvent",
+        "type": "object"
+      },
+      "SyncOut": {
+        "description": "Resultado de una sincronización: actividades creadas, actualizadas y sin cambios.",
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "updated",
+          "unchanged"
+        ],
+        "title": "SyncOut",
         "type": "object"
       },
       "ValidationError": {
@@ -528,6 +596,56 @@
         ]
       }
     },
+    "/internal/sync/wahoo": {
+      "post": {
+        "description": "Sincroniza las actividades de todas las integraciones de Wahoo activas (para n8n).\n\nSi Wahoo aplica el límite de peticiones se detiene (`rate_limited`): el resto de usuarios se\nsincroniza en la siguiente ejecución, empezando por los que llevan más tiempo sin hacerlo.",
+        "operationId": "sync_wahoo_all_internal_sync_wahoo_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-internal-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Wahoo All",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
     "/v1/integrations": {
       "get": {
         "operationId": "list_integrations_v1_integrations_get",
@@ -625,6 +743,33 @@
           }
         ],
         "summary": "Wahoo Authorize Url",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/v1/integrations/wahoo/sync": {
+      "post": {
+        "description": "Importa las actividades realizadas en Wahoo. Es idempotente: se puede repetir sin riesgo.",
+        "operationId": "sync_wahoo_v1_integrations_wahoo_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Sync Wahoo",
         "tags": [
           "integrations"
         ]
