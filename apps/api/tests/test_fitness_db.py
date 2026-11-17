@@ -148,8 +148,10 @@ def test_load_uses_threshold_in_force_on_activity_date_and_sport(
     after = _ride(athlete_id, D0 + timedelta(days=5))
     # Ciclismo sin potencia: FC sobre el LTHR de ciclismo.
     ride_hr = _ride(athlete_id, D0 + timedelta(days=4), np_w=0, avg_hr=150)
-    # Carrera con potencia y FC: sólo cuenta el ritmo (4 m/s = 250 s/km, el umbral).
+    # Carrera con potencia y FC: manda el ritmo (4 m/s = 250 s/km, el umbral).
     run = _ride(athlete_id, D0 + timedelta(days=3), sport=Sport.RUNNING, avg_speed_mps=4)
+    # Carrera en cinta sin velocidad pero con pulso: FC sobre el LTHR de carrera.
+    treadmill = _ride(athlete_id, D0 + timedelta(days=3), sport=Sport.RUNNING, avg_hr=170)
     # Trail con ritmo: sólo cuenta la FC sobre el LTHR de carrera.
     trail = _ride(
         athlete_id, D0 + timedelta(days=2), sport=Sport.TRAIL_RUNNING, avg_hr=170, avg_speed_mps=4
@@ -160,7 +162,7 @@ def test_load_uses_threshold_in_force_on_activity_date_and_sport(
     # Sin moving_s no hay carga.
     no_moving = _ride(athlete_id, D0 + timedelta(days=7), moving_s=0)
     no_moving.moving_s = None
-    session.add_all([before, after, ride_hr, run, trail, trail_no_hr, no_moving])
+    session.add_all([before, after, ride_hr, run, treadmill, trail, trail_no_hr, no_moving])
     session.flush()
 
     fitness.recompute_from(session, athlete_id, D0, today=TODAY)
@@ -173,6 +175,7 @@ def test_load_uses_threshold_in_force_on_activity_date_and_sport(
         LoadMethod.PACE,
         None,
     )
+    assert (treadmill.load, treadmill.load_method) == (Decimal("100.0"), LoadMethod.HEART_RATE)
     assert (trail.load, trail.load_method) == (Decimal("100.0"), LoadMethod.HEART_RATE)
     assert (trail_no_hr.load, trail_no_hr.load_method) == (None, None)
     assert (no_moving.load, no_moving.load_method) == (None, None)
@@ -372,6 +375,7 @@ def test_simulation_reports_changes_without_writing(
         athlete_id,
         D0 + timedelta(days=3),
         sport=Sport.RUNNING,
+        avg_hr=None,
         load=Decimal("40.0"),
         load_method=LoadMethod.HEART_RATE,
     )

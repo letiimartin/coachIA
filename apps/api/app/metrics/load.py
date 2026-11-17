@@ -25,13 +25,16 @@ cálculo en ``intensity_factor_for``) sin tocar el resto.
 
 El método se elige por disciplina (``activity_load``), no con un orden único para todas:
 
-- Ciclismo: potencia y, si no hay, FC sobre el LTHR de ciclismo.
-- Carrera: ritmo. Sin ritmo válido no hay carga (``RUNNING_FALLS_BACK_TO_HR``, decisión
-  pendiente de la autora).
-- Trail: FC sobre el LTHR de carrera y, si no hay, la carga por RPE si existe. El ritmo
-  **nunca** se usa en trail: el desnivel lo invalida.
+- Ciclismo: potencia → FC sobre el LTHR de ciclismo → RPE.
+- Carrera: ritmo → FC sobre el LTHR de carrera (p. ej. en cinta sin sensor) → RPE.
+- Trail: FC sobre el LTHR de carrera → RPE. El ritmo **nunca** se usa en trail: el desnivel
+  lo invalida.
 - Resto de deportes (senderismo, fuerza, natación, otros): FC, como antes (ni potencia ni
-  ritmo). Qué LTHR usa cada deporte lo decide ``app.metrics.zones.lthr_field_for``.
+  ritmo ni RPE). Qué LTHR usa cada deporte lo decide ``app.metrics.zones.lthr_field_for``.
+
+RPE: mientras no haya una fuente de RPE por actividad ni una fórmula RPE → TSS aprobada, sólo
+se conservan las cargas por RPE que ya existen (introducidas a mano); nunca se inventa una.
+Sin datos suficientes la carga es ``None``. ``LoadResult.method`` dice siempre qué se usó.
 
 Las funciones devuelven ``None`` cuando falta el dato o el umbral (o no es positivo): no se
 inventa carga. Una duración de 0 da carga 0. Valores negativos o no finitos son un error.
@@ -127,11 +130,6 @@ def pace_s_per_km(speed_mps: float | None) -> float | None:
     return None
 
 
-# Carrera sin ritmo válido (p. ej. cinta sin sensor): ¿FC sobre el LTHR de carrera o sin carga?
-# Decisión abierta en #22; hasta entonces, sin alternativa.
-RUNNING_FALLS_BACK_TO_HR = False
-
-
 def rpe_load(load: float | None) -> LoadResult | None:
     """Carga por RPE ya registrada (manual): se conserva tal cual, sin IF."""
     if load is None:
@@ -162,14 +160,17 @@ def activity_load(
     """
     _check_duration(duration_s)
     if sport is Sport.CYCLING:
-        return power_tss(duration_s, normalized_power_w, ftp_w) or hr_tss(
-            duration_s, avg_hr_bpm, lthr_bpm
+        return (
+            power_tss(duration_s, normalized_power_w, ftp_w)
+            or hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
+            or rpe_load(rpe)
         )
     if sport is Sport.RUNNING:
-        by_pace = run_tss(duration_s, pace_s_per_km(avg_speed_mps), threshold_pace_s_per_km)
-        if by_pace is None and RUNNING_FALLS_BACK_TO_HR:
-            return hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
-        return by_pace
+        return (
+            run_tss(duration_s, pace_s_per_km(avg_speed_mps), threshold_pace_s_per_km)
+            or hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
+            or rpe_load(rpe)
+        )
     if sport is Sport.TRAIL_RUNNING:
         return hr_tss(duration_s, avg_hr_bpm, lthr_bpm) or rpe_load(rpe)
     return hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
