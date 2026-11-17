@@ -46,6 +46,11 @@ jobs:
         run: uv run ruff format --check .
       - name: Tipos
         run: uv run mypy
+      - name: Migraciones con una única cabeza
+        run: |
+          heads=$(uv run alembic heads | grep -c "(head)")
+          echo "Cabezas de Alembic: $heads"
+          test "$heads" -eq 1
       - name: Tests (incluye esquema y migraciones contra Postgres)
         run: uv run pytest
         env:

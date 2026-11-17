@@ -1,5 +1,7 @@
 # CoachIA — Fase 0: Auditoría de LetiSmartCoach y arquitectura objetivo
 
+> **Documento histórico** (auditoría inicial). Las convenciones vigentes están en `CLAUDE.md` y el estado del proyecto en GitHub (issues, milestones y PRs).
+
 > Fecha de la auditoría: 2026-11-14 · Último commit del repo: 2026-02-18 (unos 9 meses parado)
 > Alcance: las 7 ramas remotas, el código, las migraciones, la integración con Wahoo y la deuda técnica.
 
