@@ -1,14 +1,19 @@
 """Contrato de perfil, umbrales, disponibilidad y calendario (#10).
 
-Los endpoints existen, exigen JWT, validan la entrada y, de momento, responden 501.
+Los endpoints existen, exigen JWT y validan la entrada antes de tocar la BD. El comportamiento
+contra Postgres está en `test_athlete_calendar_db.py`.
 """
 
 from typing import Any
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
+from app.core.security import TokenVerifier
+from app.db.session import Database
+from app.main import create_app
 from app.metrics.zones import HrZoneSport, hr_zones, power_zones
 from app.schemas.athlete import (
     CurrentThresholdOut,
@@ -26,7 +31,7 @@ from app.schemas.calendar import (
     RaceCreate,
     RacePatch,
 )
-from tests.conftest import TokenFactory
+from tests.conftest import FakeJWKSClient, TokenFactory, make_settings
 
 EVENT_ID = "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b"
 
@@ -65,16 +70,29 @@ def test_endpoints_require_jwt(client: TestClient, method: str, path: str, body:
     assert response.json()["error"]["code"] == "unauthorized"
 
 
+@pytest.fixture
+def lazy_db_client(ec_private_key: ec.EllipticCurvePrivateKey) -> TestClient:
+    """App con una BD configurada pero inalcanzable: SQLAlchemy no conecta hasta la primera
+    consulta, así que sirve para comprobar que la validación ocurre antes de tocar la BD."""
+    settings = make_settings()
+    app = create_app(
+        settings,
+        token_verifier=TokenVerifier(settings, FakeJWKSClient(ec_private_key.public_key())),
+        database=Database("postgresql+psycopg://nobody@127.0.0.1:1/unreachable"),
+    )
+    return TestClient(app, raise_server_exceptions=False)
+
+
 @pytest.mark.parametrize(("method", "path", "body"), VALID_REQUESTS, ids=_ids(VALID_REQUESTS))
-def test_endpoints_are_declared_but_not_implemented(
+def test_endpoints_without_database_are_unavailable(
     client: TestClient, make_token: TokenFactory, method: str, path: str, body: Any
 ) -> None:
     headers = {"Authorization": f"Bearer {make_token()}"}
 
     response = client.request(method, path, json=body, headers=headers)
 
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "not_implemented"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "service_unavailable"
 
 
 _DAY = {"max_minutes": 60, "sports": ["cycling"], "preferred_time": "any"}
@@ -198,11 +216,11 @@ INVALID_REQUESTS: list[tuple[str, str, Any]] = [
 
 @pytest.mark.parametrize(("method", "path", "body"), INVALID_REQUESTS, ids=_ids(INVALID_REQUESTS))
 def test_invalid_input_is_rejected(
-    client: TestClient, make_token: TokenFactory, method: str, path: str, body: Any
+    lazy_db_client: TestClient, make_token: TokenFactory, method: str, path: str, body: Any
 ) -> None:
     headers = {"Authorization": f"Bearer {make_token()}"}
 
-    response = client.request(method, path, json=body, headers=headers)
+    response = lazy_db_client.request(method, path, json=body, headers=headers)
 
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "validation_error"
