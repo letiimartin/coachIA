@@ -32,3 +32,7 @@ export type RacePriority = S['RacePriority'];
 export type EnrichmentStatus = S['EnrichmentStatus'];
 
 export type ErrorResponse = S['ErrorResponse'];
+
+export type IntegrationOut = S['IntegrationOut'];
+export type Provider = S['Provider'];
+export type SyncOut = S['SyncOut'];

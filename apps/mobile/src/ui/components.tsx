@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 
+import { apiConfig } from '../api/config';
 import { useUsingMock } from '../api/mockStatus';
 import { colors, spacing } from './theme';
 
@@ -27,9 +28,11 @@ type ScreenProps = {
   /** Error a mostrar arriba; al aparecer, la pantalla vuelve al principio para que se vea. */
   error?: string | null;
   onDismissError?: () => void;
+  /** false en pantallas que no piden datos a la API (el aviso de datos de prueba no aplica). */
+  mockBanner?: boolean;
 };
 
-export function Screen({ title, onBack, right, children, refreshing, onRefresh, error, onDismissError }: ScreenProps) {
+export function Screen({ title, onBack, right, children, refreshing, onRefresh, error, onDismissError, mockBanner = true }: ScreenProps) {
   const scroll = useRef<ScrollView>(null);
   useEffect(() => {
     if (error) scroll.current?.scrollTo({ y: 0, animated: true });
@@ -47,7 +50,7 @@ export function Screen({ title, onBack, right, children, refreshing, onRefresh, 
         </Text>
         {right}
       </View>
-      <MockBanner />
+      {mockBanner ? <MockBanner /> : null}
       <ScrollView
         ref={scroll}
         contentContainerStyle={styles.content}
@@ -70,7 +73,10 @@ export function MockBanner() {
   return (
     <View style={[styles.banner, styles.warning]}>
       <Text style={styles.warningText}>
-        Datos de prueba del contrato: la API aún no implementa este endpoint. Los cambios sólo duran hasta recargar la app.
+        {apiConfig.mockMode === 'auto' && apiConfig.baseUrl
+          ? 'Datos de prueba del contrato: la API aún no implementa este endpoint (501).'
+          : 'Datos de prueba del contrato (EXPO_PUBLIC_API_MOCK=on o sin EXPO_PUBLIC_API_URL).'}{' '}
+        Los cambios sólo duran hasta recargar la app.
       </Text>
     </View>
   );
@@ -290,3 +296,13 @@ export const styles = StyleSheet.create({
   muted: { color: colors.muted, fontSize: 14 },
   text: { color: colors.text, fontSize: 14 },
 });
+
+/** Funcionalidad todavía sin endpoint en la API: estado vacío explícito, sin datos inventados. */
+export function PendingFeature({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={[styles.card, { borderStyle: 'dashed' }]}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.muted}>{children}</Text>
+    </View>
+  );
+}

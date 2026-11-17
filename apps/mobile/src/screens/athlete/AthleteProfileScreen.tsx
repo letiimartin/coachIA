@@ -121,6 +121,7 @@ export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
         <Text style={styles.muted}>Umbrales, zonas y disponibilidad semanal que usa el coach para planificar.</Text>
         <Button title="Umbrales y zonas" variant="secondary" onPress={() => navigation.navigate('Thresholds')} />
         <Button title="Disponibilidad semanal" variant="secondary" onPress={() => navigation.navigate('Availability')} />
+        <Button title="Integraciones (Wahoo)" variant="secondary" onPress={() => navigation.navigate('Integrations')} />
       </Card>
 
       {onLogout ? <Button title="Cerrar sesión" variant="danger" onPress={onLogout} /> : null}

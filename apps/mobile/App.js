@@ -8,13 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { supabase } from './src/lib/supabase';
 
-// Context
-import { WorkoutsProvider } from './src/context/WorkoutsContext';
-
 // Screens
 import AuthScreen from './src/screens/AuthScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
-import WorkoutsScreen from './src/screens/WorkoutsScreen';
 // Pantallas nuevas (TypeScript) contra la API de CoachIA (#18).
 import AthleteProfileScreen from './src/screens/athlete/AthleteProfileScreen';
 import ThresholdsScreen from './src/screens/athlete/ThresholdsScreen';
@@ -22,9 +17,10 @@ import ThresholdFormScreen from './src/screens/athlete/ThresholdFormScreen';
 import AvailabilityScreen from './src/screens/athlete/AvailabilityScreen';
 import EventsScreen from './src/screens/calendar/EventsScreen';
 import EventFormScreen from './src/screens/calendar/EventFormScreen';
-import WorkoutDetailScreen from './src/screens/WorkoutDetailScreen';
-import CoachChatScreen from './src/screens/CoachChatScreen';
-import WahooCallbackScreen from './src/screens/WahooCallbackScreen';
+import DashboardScreen from './src/screens/home/DashboardScreen';
+import WorkoutsScreen from './src/screens/workouts/WorkoutsScreen';
+import CoachChatScreen from './src/screens/coach/CoachChatScreen';
+import IntegrationsScreen from './src/screens/integrations/IntegrationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -47,9 +43,9 @@ const linking = {
       },
       Thresholds: 'profile/thresholds',
       Availability: 'profile/availability',
-      WorkoutDetail: 'workout/:id',
       CoachChat: 'chat',
-      WahooCallback: 'wahoo-callback',
+      // Vuelta del OAuth de Wahoo (APP_RETURN_URL_* en la API): ?provider=wahoo&status=…&reason=…
+      Integrations: 'integrations',
     },
   },
 };
@@ -112,8 +108,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <WorkoutsProvider>
-        <NavigationContainer
+      <NavigationContainer
           theme={{
             ...DarkTheme,
             colors: {
@@ -136,15 +131,13 @@ export default function App() {
               <Stack.Screen name="ThresholdForm" component={ThresholdFormScreen} />
               <Stack.Screen name="Availability" component={AvailabilityScreen} />
               <Stack.Screen name="EventForm" component={EventFormScreen} />
-              <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
               <Stack.Screen name="CoachChat" component={CoachChatScreen} />
-              <Stack.Screen name="WahooCallback" component={WahooCallbackScreen} />
+              <Stack.Screen name="Integrations" component={IntegrationsScreen} />
             </Stack.Navigator>
           ) : (
             <AuthScreen onLogin={() => { }} />
           )}
-        </NavigationContainer>
-      </WorkoutsProvider>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
