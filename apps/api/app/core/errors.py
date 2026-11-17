@@ -67,6 +67,14 @@ class BadGatewayError(AppError):
     message = "Un servicio externo no ha respondido correctamente."
 
 
+class NotImplementedApiError(AppError):
+    """Endpoint declarado en el contrato pero todavía sin implementar."""
+
+    status_code = 501
+    code = "not_implemented"
+    message = "Endpoint todavía no implementado."
+
+
 class ServiceUnavailableError(AppError):
     status_code = 503
     code = "service_unavailable"

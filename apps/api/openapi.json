@@ -14,6 +14,669 @@
         "title": "AuthorizeUrlOut",
         "type": "object"
       },
+      "AvailabilityDay": {
+        "additionalProperties": false,
+        "description": "Disponibilidad habitual de un día de la semana (0 = lunes … 6 = domingo).",
+        "properties": {
+          "is_preferred_rest": {
+            "default": false,
+            "title": "Is Preferred Rest",
+            "type": "boolean"
+          },
+          "max_minutes": {
+            "anyOf": [
+              {
+                "maximum": 1440.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Minutos disponibles; null = sin límite fijado.",
+            "title": "Max Minutes"
+          },
+          "preferred_time": {
+            "$ref": "#/components/schemas/PreferredTime",
+            "default": "any"
+          },
+          "sports": {
+            "items": {
+              "$ref": "#/components/schemas/Sport"
+            },
+            "maxItems": 7,
+            "title": "Sports",
+            "type": "array"
+          },
+          "weekday": {
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday"
+        ],
+        "title": "AvailabilityDay",
+        "type": "object"
+      },
+      "CalendarEventCreate": {
+        "additionalProperties": false,
+        "description": "Nuevo evento. Las fechas deben llevar zona horaria (ISO 8601 con desfase).\n\nSi `kind` es `race` y no se envía `race`, se crea la carrera con los valores por defecto.",
+        "examples": [
+          {
+            "all_day": false,
+            "kind": "race",
+            "race": {
+              "ascent_m": 2400.0,
+              "discipline": "trail_running",
+              "distance_m": 42000.0,
+              "goal": "Terminar por debajo de 6 h.",
+              "priority": "A",
+              "source_url": "https://example.com/carrera"
+            },
+            "start_at": "2027-04-18T07:00:00+02:00",
+            "title": "Trail de la Sierra",
+            "training_impact": "none"
+          },
+          {
+            "all_day": true,
+            "end_at": "2026-12-04T23:59:00+01:00",
+            "kind": "travel",
+            "notes": "Hotel con gimnasio.",
+            "start_at": "2026-12-02T00:00:00+01:00",
+            "title": "Viaje de trabajo a Lisboa",
+            "training_impact": "reduce"
+          }
+        ],
+        "properties": {
+          "all_day": {
+            "default": true,
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "race": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaceCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "training_impact": {
+            "$ref": "#/components/schemas/TrainingImpact",
+            "default": "none"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "start_at"
+        ],
+        "title": "CalendarEventCreate",
+        "type": "object"
+      },
+      "CalendarEventOut": {
+        "examples": [
+          {
+            "all_day": false,
+            "created_at": "2026-11-17T10:00:00Z",
+            "details": {},
+            "id": "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+            "kind": "race",
+            "race": {
+              "ascent_m": 2400.0,
+              "discipline": "trail_running",
+              "distance_m": 42000.0,
+              "enrichment_status": "none",
+              "goal": "Terminar por debajo de 6 h.",
+              "priority": "A",
+              "source_url": "https://example.com/carrera"
+            },
+            "start_at": "2027-04-18T05:00:00Z",
+            "title": "Trail de la Sierra",
+            "training_impact": "none",
+            "updated_at": "2026-11-17T10:00:00Z"
+          }
+        ],
+        "properties": {
+          "all_day": {
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "race": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaceOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sólo en eventos de tipo 'race'."
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "training_impact": {
+            "$ref": "#/components/schemas/TrainingImpact"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "start_at",
+          "end_at",
+          "all_day",
+          "training_impact",
+          "notes",
+          "details",
+          "race",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CalendarEventOut",
+        "type": "object"
+      },
+      "CalendarEventPatch": {
+        "additionalProperties": false,
+        "description": "Actualización parcial de un evento: sólo se cambian los campos enviados.\n\n- `end_at` y `notes` admiten `null` para borrarlos; el resto de campos no.\n- `race` se fusiona con los datos de carrera existentes (ver `RacePatch`).\n- Si `kind` deja de ser `race`, se borran los datos de la carrera.\n- La coherencia `end_at >= start_at` se comprueba con el evento resultante (409 si no).",
+        "examples": [
+          {
+            "race": {
+              "priority": "A"
+            },
+            "title": "Trail de la Sierra (42K)"
+          },
+          {
+            "training_impact": "no_training"
+          }
+        ],
+        "properties": {
+          "all_day": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Day"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "race": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RacePatch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "training_impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingImpact"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "CalendarEventPatch",
+        "type": "object"
+      },
+      "CurrentThresholdOut": {
+        "description": "Umbral vigente en la fecha `on` (la fila más reciente con `effective_from <= on`).",
+        "examples": [
+          {
+            "on": "2026-11-17",
+            "threshold": {
+              "created_at": "2026-11-01T19:00:00Z",
+              "effective_from": "2026-11-01",
+              "ftp_w": 230,
+              "hr_max_bpm": 186,
+              "hr_rest_bpm": 48,
+              "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
+              "lthr_bpm": 168,
+              "notes": "Test de 20 min en rodillo.",
+              "source": "test",
+              "threshold_pace_s_per_km": 285.0,
+              "updated_at": "2026-11-01T19:00:00Z",
+              "vo2max": 52.0,
+              "weight_kg": 58.5
+            },
+            "zones": {
+              "hr_cycling": [
+                {
+                  "code": "Z1",
+                  "high": 136.1,
+                  "low": 0.0,
+                  "name": "Recuperación",
+                  "number": 1
+                },
+                {
+                  "code": "Z2",
+                  "high": 151.2,
+                  "low": 136.1,
+                  "name": "Resistencia aeróbica",
+                  "number": 2
+                },
+                {
+                  "code": "Z3",
+                  "high": 157.9,
+                  "low": 151.2,
+                  "name": "Tempo",
+                  "number": 3
+                },
+                {
+                  "code": "Z4",
+                  "high": 168.0,
+                  "low": 157.9,
+                  "name": "Subumbral",
+                  "number": 4
+                },
+                {
+                  "code": "Z5a",
+                  "high": 173.0,
+                  "low": 168.0,
+                  "name": "Supraumbral",
+                  "number": 5
+                },
+                {
+                  "code": "Z5b",
+                  "high": 178.1,
+                  "low": 173.0,
+                  "name": "Capacidad aeróbica",
+                  "number": 6
+                },
+                {
+                  "code": "Z5c",
+                  "low": 178.1,
+                  "name": "Potencia anaeróbica",
+                  "number": 7
+                }
+              ],
+              "hr_running": [
+                {
+                  "code": "Z1",
+                  "high": 142.8,
+                  "low": 0.0,
+                  "name": "Recuperación",
+                  "number": 1
+                },
+                {
+                  "code": "Z2",
+                  "high": 151.2,
+                  "low": 142.8,
+                  "name": "Resistencia aeróbica",
+                  "number": 2
+                },
+                {
+                  "code": "Z3",
+                  "high": 159.6,
+                  "low": 151.2,
+                  "name": "Tempo",
+                  "number": 3
+                },
+                {
+                  "code": "Z4",
+                  "high": 168.0,
+                  "low": 159.6,
+                  "name": "Subumbral",
+                  "number": 4
+                },
+                {
+                  "code": "Z5a",
+                  "high": 173.0,
+                  "low": 168.0,
+                  "name": "Supraumbral",
+                  "number": 5
+                },
+                {
+                  "code": "Z5b",
+                  "high": 178.1,
+                  "low": 173.0,
+                  "name": "Capacidad aeróbica",
+                  "number": 6
+                },
+                {
+                  "code": "Z5c",
+                  "low": 178.1,
+                  "name": "Potencia anaeróbica",
+                  "number": 7
+                }
+              ],
+              "power": [
+                {
+                  "code": "Z1",
+                  "high": 126.5,
+                  "low": 0.0,
+                  "name": "Recuperación activa",
+                  "number": 1
+                },
+                {
+                  "code": "Z2",
+                  "high": 172.5,
+                  "low": 126.5,
+                  "name": "Resistencia",
+                  "number": 2
+                },
+                {
+                  "code": "Z3",
+                  "high": 207.0,
+                  "low": 172.5,
+                  "name": "Tempo",
+                  "number": 3
+                },
+                {
+                  "code": "Z4",
+                  "high": 241.5,
+                  "low": 207.0,
+                  "name": "Umbral",
+                  "number": 4
+                },
+                {
+                  "code": "Z5",
+                  "high": 276.0,
+                  "low": 241.5,
+                  "name": "VO2máx",
+                  "number": 5
+                },
+                {
+                  "code": "Z6",
+                  "high": 345.0,
+                  "low": 276.0,
+                  "name": "Capacidad anaeróbica",
+                  "number": 6
+                },
+                {
+                  "code": "Z7",
+                  "low": 345.0,
+                  "name": "Neuromuscular",
+                  "number": 7
+                }
+              ]
+            }
+          }
+        ],
+        "properties": {
+          "on": {
+            "format": "date",
+            "title": "On",
+            "type": "string"
+          },
+          "threshold": {
+            "$ref": "#/components/schemas/ThresholdOut"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/ZonesOut"
+          }
+        },
+        "required": [
+          "on",
+          "threshold",
+          "zones"
+        ],
+        "title": "CurrentThresholdOut",
+        "type": "object"
+      },
+      "EnrichmentStatus": {
+        "description": "Datos de la carrera completados automáticamente (p. ej. con n8n) y revisión del usuario.",
+        "enum": [
+          "none",
+          "pending_review",
+          "confirmed"
+        ],
+        "title": "EnrichmentStatus",
+        "type": "string"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "description": "Formato de todas las respuestas de error de la API.",
+        "examples": [
+          {
+            "error": {
+              "code": "unauthorized",
+              "message": "Autenticación requerida."
+            },
+            "request_id": "6f1c2a8e3b9d4f7a"
+          }
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "error",
+          "request_id"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EventKind": {
+        "enum": [
+          "race",
+          "social",
+          "travel",
+          "health",
+          "personal",
+          "unavailable"
+        ],
+        "title": "EventKind",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -208,6 +871,241 @@
         "title": "PingResponse",
         "type": "object"
       },
+      "PreferredTime": {
+        "enum": [
+          "morning",
+          "midday",
+          "afternoon",
+          "evening",
+          "any"
+        ],
+        "title": "PreferredTime",
+        "type": "string"
+      },
+      "ProfileOut": {
+        "description": "Perfil del atleta autenticado. Se crea automáticamente la primera vez que se pide.",
+        "examples": [
+          {
+            "birth_date": "1990-05-14",
+            "created_at": "2026-11-01T09:00:00Z",
+            "display_name": "Leti",
+            "height_cm": 168.0,
+            "preferences": {
+              "language": "es",
+              "units": "metric"
+            },
+            "sex": "female",
+            "sports": [
+              "cycling",
+              "trail_running"
+            ],
+            "timezone": "Europe/Madrid",
+            "updated_at": "2026-11-15T18:30:00Z",
+            "user_id": "11111111-2222-3333-4444-555555555555"
+          }
+        ],
+        "properties": {
+          "birth_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm"
+          },
+          "preferences": {
+            "additionalProperties": true,
+            "title": "Preferences",
+            "type": "object"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sports": {
+            "items": {
+              "$ref": "#/components/schemas/Sport"
+            },
+            "title": "Sports",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "birth_date",
+          "sex",
+          "height_cm",
+          "timezone",
+          "sports",
+          "preferences",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProfileOut",
+        "type": "object"
+      },
+      "ProfilePatch": {
+        "additionalProperties": false,
+        "description": "Actualización parcial: sólo se cambian los campos enviados.\n\n`null` borra el valor en los campos opcionales; `timezone`, `sports` y `preferences` no\nadmiten `null`. `preferences` se sustituye entero (no se fusiona).",
+        "examples": [
+          {
+            "display_name": "Leti",
+            "height_cm": 168.0,
+            "sports": [
+              "cycling",
+              "trail_running"
+            ]
+          },
+          {
+            "timezone": "Atlantic/Canary"
+          }
+        ],
+        "properties": {
+          "birth_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "description": "Altura en cm (1 decimal).",
+                "maximum": 250.0,
+                "minimum": 100.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferences"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sports": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Sport"
+                },
+                "maxItems": 7,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sports"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "title": "ProfilePatch",
+        "type": "object"
+      },
       "Provider": {
         "enum": [
           "wahoo",
@@ -216,6 +1114,288 @@
           "garmin"
         ],
         "title": "Provider",
+        "type": "string"
+      },
+      "RaceCreate": {
+        "additionalProperties": false,
+        "description": "Datos de la carrera. Todos opcionales: se pueden completar más tarde.",
+        "examples": [
+          {
+            "ascent_m": 2400.0,
+            "discipline": "trail_running",
+            "distance_m": 42000.0,
+            "goal": "Terminar por debajo de 6 h.",
+            "priority": "A",
+            "source_url": "https://example.com/carrera"
+          }
+        ],
+        "properties": {
+          "ascent_m": {
+            "anyOf": [
+              {
+                "description": "Desnivel positivo en metros.",
+                "exclusiveMaximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ascent M"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaceDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "description": "Distancia en metros.",
+                "exclusiveMaximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/RacePriority",
+            "default": "B"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "description": "Web oficial de la carrera.",
+                "format": "uri",
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "title": "RaceCreate",
+        "type": "object"
+      },
+      "RaceDiscipline": {
+        "enum": [
+          "road_cycling",
+          "gravel",
+          "mtb",
+          "trail_running",
+          "road_running",
+          "other"
+        ],
+        "title": "RaceDiscipline",
+        "type": "string"
+      },
+      "RaceOut": {
+        "properties": {
+          "ascent_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ascent M"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaceDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "enrichment_status": {
+            "$ref": "#/components/schemas/EnrichmentStatus"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/RacePriority"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "required": [
+          "discipline",
+          "distance_m",
+          "ascent_m",
+          "priority",
+          "goal",
+          "enrichment_status",
+          "source_url"
+        ],
+        "title": "RaceOut",
+        "type": "object"
+      },
+      "RacePatch": {
+        "additionalProperties": false,
+        "description": "Actualización parcial de la carrera. `null` borra el valor (salvo `priority` y\n`enrichment_status`, que no lo admiten).\n\n`enrichment_status` permite al atleta confirmar (`confirmed`) los datos completados\nautomáticamente (`pending_review`).",
+        "examples": [
+          {
+            "enrichment_status": "confirmed",
+            "priority": "B"
+          }
+        ],
+        "properties": {
+          "ascent_m": {
+            "anyOf": [
+              {
+                "description": "Desnivel positivo en metros.",
+                "exclusiveMaximum": 1000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ascent M"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RaceDiscipline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "description": "Distancia en metros.",
+                "exclusiveMaximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "enrichment_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrichmentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RacePriority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "description": "Web oficial de la carrera.",
+                "format": "uri",
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "title": "RacePatch",
+        "type": "object"
+      },
+      "RacePriority": {
+        "enum": [
+          "A",
+          "B",
+          "C"
+        ],
+        "title": "RacePriority",
         "type": "string"
       },
       "ReadinessResponse": {
@@ -283,6 +1463,28 @@
         ],
         "title": "RootResponse",
         "type": "object"
+      },
+      "Sex": {
+        "enum": [
+          "female",
+          "male",
+          "other"
+        ],
+        "title": "Sex",
+        "type": "string"
+      },
+      "Sport": {
+        "enum": [
+          "cycling",
+          "running",
+          "trail_running",
+          "hiking",
+          "strength",
+          "swimming",
+          "other"
+        ],
+        "title": "Sport",
+        "type": "string"
       },
       "StravaEvent": {
         "properties": {
@@ -360,6 +1562,319 @@
         "title": "SyncOut",
         "type": "object"
       },
+      "ThresholdCreate": {
+        "additionalProperties": false,
+        "description": "Nuevo juego de umbrales vigente desde `effective_from` (una fila por fecha).\n\nEs una foto completa: los valores que no se envían quedan vacíos para esa fecha. La app\ndebería precargar el formulario con el umbral vigente. Debe incluir al menos un umbral.",
+        "examples": [
+          {
+            "effective_from": "2026-11-01",
+            "ftp_w": 230,
+            "hr_max_bpm": 186,
+            "hr_rest_bpm": 48,
+            "lthr_bpm": 168,
+            "notes": "Test de 20 min en rodillo.",
+            "source": "test",
+            "threshold_pace_s_per_km": 285.0,
+            "vo2max": 52.0,
+            "weight_kg": 58.5
+          }
+        ],
+        "properties": {
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "ftp_w": {
+            "anyOf": [
+              {
+                "description": "FTP en vatios.",
+                "maximum": 700.0,
+                "minimum": 50.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ftp W"
+          },
+          "hr_max_bpm": {
+            "anyOf": [
+              {
+                "description": "FC máxima (ppm).",
+                "maximum": 240.0,
+                "minimum": 100.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Max Bpm"
+          },
+          "hr_rest_bpm": {
+            "anyOf": [
+              {
+                "description": "FC en reposo (ppm).",
+                "maximum": 120.0,
+                "minimum": 25.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Rest Bpm"
+          },
+          "lthr_bpm": {
+            "anyOf": [
+              {
+                "description": "FC de umbral láctico (ppm).",
+                "maximum": 230.0,
+                "minimum": 80.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lthr Bpm"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ThresholdSource",
+            "default": "manual"
+          },
+          "threshold_pace_s_per_km": {
+            "anyOf": [
+              {
+                "description": "Ritmo umbral de carrera en s/km (1 decimal).",
+                "maximum": 1800.0,
+                "minimum": 120.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Pace S Per Km"
+          },
+          "vo2max": {
+            "anyOf": [
+              {
+                "description": "VO2máx en ml/kg/min (1 decimal).",
+                "maximum": 100.0,
+                "minimum": 10.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vo2Max"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "description": "Peso en kg (2 decimales).",
+                "maximum": 250.0,
+                "minimum": 25.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "effective_from"
+        ],
+        "title": "ThresholdCreate",
+        "type": "object"
+      },
+      "ThresholdOut": {
+        "examples": [
+          {
+            "created_at": "2026-11-01T19:00:00Z",
+            "effective_from": "2026-11-01",
+            "ftp_w": 230,
+            "hr_max_bpm": 186,
+            "hr_rest_bpm": 48,
+            "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
+            "lthr_bpm": 168,
+            "notes": "Test de 20 min en rodillo.",
+            "source": "test",
+            "threshold_pace_s_per_km": 285.0,
+            "updated_at": "2026-11-01T19:00:00Z",
+            "vo2max": 52.0,
+            "weight_kg": 58.5
+          }
+        ],
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "ftp_w": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ftp W"
+          },
+          "hr_max_bpm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Max Bpm"
+          },
+          "hr_rest_bpm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Rest Bpm"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lthr_bpm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lthr Bpm"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ThresholdSource"
+          },
+          "threshold_pace_s_per_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Pace S Per Km"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "vo2max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vo2Max"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "id",
+          "effective_from",
+          "ftp_w",
+          "lthr_bpm",
+          "hr_max_bpm",
+          "hr_rest_bpm",
+          "threshold_pace_s_per_km",
+          "vo2max",
+          "weight_kg",
+          "source",
+          "notes",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ThresholdOut",
+        "type": "object"
+      },
+      "ThresholdSource": {
+        "enum": [
+          "manual",
+          "test",
+          "estimated"
+        ],
+        "title": "ThresholdSource",
+        "type": "string"
+      },
+      "TrainingImpact": {
+        "description": "Cómo debe tratar el coach el evento al planificar.",
+        "enum": [
+          "none",
+          "reduce",
+          "no_training",
+          "move"
+        ],
+        "title": "TrainingImpact",
+        "type": "string"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -398,6 +1913,192 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WeekAvailability": {
+        "additionalProperties": false,
+        "description": "Los 7 días de la semana, ordenados de lunes (0) a domingo (6).\n\nEn `GET` siempre vienen los 7 (con valores por defecto si el atleta no los ha rellenado).\nEn `PUT` hay que enviar los 7 y se sustituye la semana entera.",
+        "examples": [
+          {
+            "days": [
+              {
+                "is_preferred_rest": true,
+                "max_minutes": 0,
+                "preferred_time": "any",
+                "sports": [],
+                "weekday": 0
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 60,
+                "preferred_time": "morning",
+                "sports": [
+                  "running"
+                ],
+                "weekday": 1
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 90,
+                "preferred_time": "evening",
+                "sports": [
+                  "cycling"
+                ],
+                "weekday": 2
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 60,
+                "preferred_time": "morning",
+                "sports": [
+                  "running",
+                  "strength"
+                ],
+                "weekday": 3
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 45,
+                "preferred_time": "evening",
+                "sports": [
+                  "cycling"
+                ],
+                "weekday": 4
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 240,
+                "preferred_time": "morning",
+                "sports": [
+                  "cycling"
+                ],
+                "weekday": 5
+              },
+              {
+                "is_preferred_rest": false,
+                "max_minutes": 180,
+                "preferred_time": "morning",
+                "sports": [
+                  "trail_running"
+                ],
+                "weekday": 6
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/AvailabilityDay"
+            },
+            "maxItems": 7,
+            "minItems": 7,
+            "title": "Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "title": "WeekAvailability",
+        "type": "object"
+      },
+      "ZoneOut": {
+        "description": "Zona `[low, high)` tal como la calcula `app.metrics.zones.Zone`.\n\nUnidades: vatios en las zonas de potencia y ppm en las de FC. `high` null: sin límite.",
+        "properties": {
+          "code": {
+            "description": "Código de la zona: Z1…Z7 (potencia) o Z1…Z5c (FC).",
+            "title": "Code",
+            "type": "string"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "description": "Posición de la zona (1 = la más suave).",
+            "minimum": 1.0,
+            "title": "Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "code",
+          "name",
+          "low",
+          "high"
+        ],
+        "title": "ZoneOut",
+        "type": "object"
+      },
+      "ZonesOut": {
+        "description": "Zonas calculadas a partir del umbral vigente. Null si falta el umbral correspondiente.\n\n- `power`: 7 zonas de Coggan sobre `ftp_w` (W).\n- `hr_cycling` / `hr_running`: 7 zonas de Friel sobre `lthr_bpm` (ppm), tabla de ciclismo\n  y de carrera.",
+        "properties": {
+          "hr_cycling": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZoneOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Cycling"
+          },
+          "hr_running": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZoneOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Running"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZoneOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          }
+        },
+        "required": [
+          "power",
+          "hr_cycling",
+          "hr_running"
+        ],
+        "title": "ZonesOut",
         "type": "object"
       }
     },
@@ -643,6 +2344,764 @@
         "summary": "Sync Wahoo All",
         "tags": [
           "internal"
+        ]
+      }
+    },
+    "/v1/athlete/availability": {
+      "get": {
+        "description": "Disponibilidad de los 7 días (con valores por defecto en los días sin rellenar).",
+        "operationId": "get_availability_v1_athlete_availability_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekAvailability"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Availability",
+        "tags": [
+          "athlete"
+        ]
+      },
+      "put": {
+        "description": "Sustituye la disponibilidad de la semana entera (hay que enviar los 7 días).",
+        "operationId": "replace_availability_v1_athlete_availability_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeekAvailability"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekAvailability"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace Availability",
+        "tags": [
+          "athlete"
+        ]
+      }
+    },
+    "/v1/athlete/profile": {
+      "get": {
+        "description": "Perfil del atleta. Si no existe todavía, se crea con los valores por defecto.",
+        "operationId": "get_profile_v1_athlete_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Profile",
+        "tags": [
+          "athlete"
+        ]
+      },
+      "patch": {
+        "description": "Actualiza sólo los campos enviados y devuelve el perfil completo.",
+        "operationId": "update_profile_v1_athlete_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Profile",
+        "tags": [
+          "athlete"
+        ]
+      }
+    },
+    "/v1/athlete/thresholds": {
+      "get": {
+        "description": "Historial de umbrales, del más reciente al más antiguo (por `effective_from`).",
+        "operationId": "list_thresholds_v1_athlete_thresholds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThresholdOut"
+                  },
+                  "title": "Response List Thresholds V1 Athlete Thresholds Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Thresholds",
+        "tags": [
+          "athlete"
+        ]
+      },
+      "post": {
+        "description": "Registra umbrales vigentes desde `effective_from`. 409 si ya hay umbrales en esa fecha.",
+        "operationId": "create_threshold_v1_athlete_thresholds_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThresholdCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Threshold",
+        "tags": [
+          "athlete"
+        ]
+      }
+    },
+    "/v1/athlete/thresholds/current": {
+      "get": {
+        "description": "Umbral vigente en la fecha y zonas calculadas a partir de él. 404 si no hay ninguno.",
+        "operationId": "get_current_threshold_v1_athlete_thresholds_current_get",
+        "parameters": [
+          {
+            "description": "Fecha de referencia. Por defecto, hoy en la zona horaria del atleta.",
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Fecha de referencia. Por defecto, hoy en la zona horaria del atleta.",
+              "title": "On"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentThresholdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Current Threshold",
+        "tags": [
+          "athlete"
+        ]
+      }
+    },
+    "/v1/calendar/events": {
+      "get": {
+        "description": "Eventos que se solapan con el rango `[from, to]`, ordenados por `start_at`. Sin paginar.",
+        "operationId": "list_events_v1_calendar_events_get",
+        "parameters": [
+          {
+            "description": "Primer día del rango (incluido).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "Primer día del rango (incluido).",
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Último día del rango (incluido).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "Último día del rango (incluido).",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarEventOut"
+                  },
+                  "title": "Response List Events V1 Calendar Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Events",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "post": {
+        "operationId": "create_event_v1_calendar_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarEventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Event",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/v1/calendar/events/{event_id}": {
+      "delete": {
+        "description": "Borra el evento (y sus datos de carrera, si los tiene).",
+        "operationId": "delete_event_v1_calendar_events__event_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Event",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "patch": {
+        "description": "Actualiza sólo los campos enviados. 409 si el evento resultante no es coherente.",
+        "operationId": "update_event_v1_calendar_events__event_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarEventPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Event",
+        "tags": [
+          "calendar"
         ]
       }
     },
