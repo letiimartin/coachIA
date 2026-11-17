@@ -51,6 +51,13 @@ jobs:
           heads=$(uv run alembic heads | grep -c "(head)")
           echo "Cabezas de Alembic: $heads"
           test "$heads" -eq 1
+      - name: Contrato OpenAPI actualizado
+        run: |
+          uv run python -m scripts.export_openapi
+          git diff --exit-code -- openapi.json || {
+            echo "::error::openapi.json está desactualizado. Ejecuta 'uv run python -m scripts.export_openapi' en apps/api y súbelo."
+            exit 1
+          }
       - name: Tests (incluye esquema y migraciones contra Postgres)
         run: uv run pytest
         env:
