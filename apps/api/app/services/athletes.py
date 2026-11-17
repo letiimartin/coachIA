@@ -1,7 +1,9 @@
 """Operaciones sobre el perfil del atleta."""
 
 import uuid
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
@@ -49,3 +51,8 @@ def athlete_timezone(session: Session, user_id: uuid.UUID) -> str:
         sa.select(AthleteProfile.timezone).where(AthleteProfile.user_id == user_id)
     )
     return timezone or DEFAULT_TIMEZONE
+
+
+def today_for(session: Session, user_id: uuid.UUID) -> date:
+    """Hoy en la zona horaria del atleta."""
+    return datetime.now(ZoneInfo(athlete_timezone(session, user_id))).date()

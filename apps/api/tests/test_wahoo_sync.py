@@ -1,7 +1,8 @@
 import copy
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -24,7 +25,14 @@ from app.integrations.wahoo.client import (
     WahooUnauthorizedError,
 )
 from app.main import create_app
-from app.models import Activity, Integration, IntegrationStatus
+from app.models import (
+    Activity,
+    AthleteThreshold,
+    DailyLoad,
+    Integration,
+    IntegrationStatus,
+    LoadMethod,
+)
 from tests.conftest import (
     FERNET_KEY,
     INTERNAL_KEY,
@@ -241,6 +249,47 @@ def test_repeated_sync_is_idempotent_and_detects_changes(
     activities = _activities(engine, user_id)
     assert {a.external_id: a.id for a in activities} == first_ids
     assert activities[1].avg_hr == 101
+
+
+@requires_db
+def test_sync_computes_load_and_recomputes_the_series(
+    session: Session,
+    engine: Engine,
+    user_id: uuid.UUID,
+    wahoo: WahooClient,
+    cipher: TokenCipher,
+    fake_wahoo: FakeWahoo,
+) -> None:
+    _connect(session, user_id)
+    session.add(AthleteThreshold(user_id=user_id, effective_from=date(2015, 1, 1), ftp_w=200))
+    session.commit()
+
+    sync.sync_user(session, cipher, wahoo, user_id)
+
+    ride = _activities(engine, user_id)[1]
+    # 179 s en movimiento a NP 150 con FTP 200: IF 0.75 -> 179/3600 · 0.5625 · 100 = 2.8.
+    assert (ride.load, ride.load_method, ride.intensity_factor) == (
+        Decimal("2.8"),
+        LoadMethod.POWER,
+        Decimal("0.750"),
+    )
+    assert _daily_load(engine, user_id, date(2015, 8, 12)) == Decimal("2.8")
+
+    # Un sync que modifica la actividad recalcula su carga y la serie desde su fecha.
+    edited = copy.deepcopy(fake_wahoo.pages[1])
+    edited["workouts"][1]["workout_summary"]["power_bike_np_last"] = "200.00"
+    fake_wahoo.pages[1] = edited
+    sync.sync_user(session, cipher, wahoo, user_id)
+
+    assert _activities(engine, user_id)[1].load == Decimal("5.0")
+    assert _daily_load(engine, user_id, date(2015, 8, 12)) == Decimal("5.0")
+
+
+def _daily_load(engine: Engine, user_id: uuid.UUID, day: date) -> Decimal | None:
+    with Session(engine) as session:
+        return session.scalar(
+            select(DailyLoad.load).where(DailyLoad.user_id == user_id, DailyLoad.day == day)
+        )
 
 
 @requires_db
