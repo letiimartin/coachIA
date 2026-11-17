@@ -243,6 +243,35 @@ export const contractExamples: Record<string, unknown[]> = {
       "request_id": "6f1c2a8e3b9d4f7a"
     }
   ],
+  "FitnessSeriesOut": [
+    {
+      "days": [
+        {
+          "atl": 62.9,
+          "ctl": 55.6,
+          "day": "2026-11-10",
+          "load": 80,
+          "tsb": -5
+        },
+        {
+          "atl": 53.9,
+          "ctl": 54.3,
+          "day": "2026-11-11",
+          "load": 0,
+          "tsb": -7.3
+        },
+        {
+          "atl": 63.3,
+          "ctl": 55.8,
+          "day": "2026-11-12",
+          "load": 120,
+          "tsb": 0.4
+        }
+      ],
+      "from": "2026-11-10",
+      "to": "2026-11-12"
+    }
+  ],
   "ProfileOut": [
     {
       "birth_date": "1990-05-14",

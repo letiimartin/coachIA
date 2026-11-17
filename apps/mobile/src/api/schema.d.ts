@@ -135,6 +135,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/athlete/fitness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fitness Series
+         * @description Carga diaria y CTL/ATL/TSB de cada día del rango `[from, to]` (máximo 366 días).
+         */
+        get: operations["get_fitness_series_v1_athlete_fitness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/athlete/profile": {
         parameters: {
             query?: never;
@@ -761,6 +781,79 @@ export interface components {
          * @enum {string}
          */
         EventKind: "race" | "social" | "travel" | "health" | "personal" | "unavailable";
+        /**
+         * FitnessDayOut
+         * @description Un día de la serie. Valores redondeados a 1 decimal.
+         *
+         *     - `load`: carga total del día (suma del TSS/hrTSS/rTSS de sus actividades, sin duplicados).
+         *     - `ctl`: forma física (media exponencial de 42 días) al final del día.
+         *     - `atl`: fatiga (media exponencial de 7 días) al final del día.
+         *     - `tsb`: frescura con la que se empieza el día: CTL − ATL **del día anterior**
+         *       (criterio de TrainingPeaks).
+         */
+        FitnessDayOut: {
+            /** Atl */
+            atl: number;
+            /** Ctl */
+            ctl: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Load */
+            load: number;
+            /** Tsb */
+            tsb: number;
+        };
+        /**
+         * FitnessSeriesOut
+         * @description Serie diaria continua (un elemento por día del rango, ordenada por fecha).
+         *
+         *     Antes de la primera actividad todo vale 0. Los días sin actividad tienen `load` 0, y los
+         *     días posteriores al último recálculo continúan la serie como descanso.
+         * @example {
+         *       "days": [
+         *         {
+         *           "atl": 62.9,
+         *           "ctl": 55.6,
+         *           "day": "2026-11-10",
+         *           "load": 80,
+         *           "tsb": -5
+         *         },
+         *         {
+         *           "atl": 53.9,
+         *           "ctl": 54.3,
+         *           "day": "2026-11-11",
+         *           "load": 0,
+         *           "tsb": -7.3
+         *         },
+         *         {
+         *           "atl": 63.3,
+         *           "ctl": 55.8,
+         *           "day": "2026-11-12",
+         *           "load": 120,
+         *           "tsb": 0.4
+         *         }
+         *       ],
+         *       "from": "2026-11-10",
+         *       "to": "2026-11-12"
+         *     }
+         */
+        FitnessSeriesOut: {
+            /** Days */
+            days: components["schemas"]["FitnessDayOut"][];
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -1548,6 +1641,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeekAvailability"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_fitness_series_v1_athlete_fitness_get: {
+        parameters: {
+            query: {
+                /** @description Primer día del rango (incluido). */
+                from: string;
+                /** @description Último día del rango (incluido). */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitnessSeriesOut"];
                 };
             };
             /** @description Falta el JWT o no es válido. */
