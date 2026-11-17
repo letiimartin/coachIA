@@ -169,9 +169,9 @@ class ZoneKind(enum.StrEnum):
 
 # Columna de `athlete_thresholds` con el LTHR de cada deporte, para sus zonas de FC y para la
 # carga por FC. Única correspondencia: un `trail_lthr_bpm` futuro sólo cambia la entrada de
-# trail. Los deportes que no son disciplinas (senderismo, fuerza, natación, otros) mantienen la
-# carga por FC de antes; como ya no hay LTHR único, usan el de carrera. Provisional: la fuerza
-# está pendiente de una decisión de la autora (ver el PR de #22).
+# trail. Senderismo, natación y otros mantienen la carga por FC de antes; como ya no hay LTHR
+# único, usan el de carrera (provisional, ver el PR de #22). La fuerza no usa la FC para la
+# carga (``app.metrics.load.LOAD_RULES``).
 _LTHR_FIELD: Mapping[Sport, str] = {
     Sport.CYCLING: "cycling_lthr_bpm",
     Sport.RUNNING: "running_lthr_bpm",

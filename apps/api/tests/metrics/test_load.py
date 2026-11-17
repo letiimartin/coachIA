@@ -3,16 +3,19 @@ import math
 import pytest
 
 from app.metrics.load import (
+    LOAD_RULES,
     LoadResult,
     activity_load,
+    counts_in_daily_load,
     hr_tss,
     intensity_factor_for,
     pace_s_per_km,
     power_tss,
-    rpe_load,
     run_tss,
+    session_rpe_load,
 )
 from app.models import LoadMethod, Sport
+from app.models.activity import Activity
 
 
 def test_one_hour_at_threshold_is_100() -> None:
@@ -116,25 +119,22 @@ EVERYTHING = {
 }
 
 
-def test_cycling_uses_power_then_hr_then_rpe() -> None:
-    result = activity_load(Sport.CYCLING, 3600, **EVERYTHING, rpe=50.0)
+def test_cycling_uses_power_then_hr() -> None:
+    result = activity_load(Sport.CYCLING, 3600, **EVERYTHING, rpe=7)
     assert result is not None and result.method is LoadMethod.POWER
 
     no_ftp = {**EVERYTHING, "ftp_w": None}
-    result = activity_load(Sport.CYCLING, 3600, **no_ftp, rpe=50.0)
+    result = activity_load(Sport.CYCLING, 3600, **no_ftp, rpe=7)
     assert result is not None and result.method is LoadMethod.HEART_RATE
     assert result.load == pytest.approx((150 / 170) ** 2 * 100)
 
+    # Sin FC: el paso RPE no tiene fórmula aprobada y el ritmo nunca cuenta en ciclismo.
     no_hr = {**no_ftp, "avg_hr_bpm": None}
-    assert activity_load(Sport.CYCLING, 3600, **no_hr, rpe=50.0) == LoadResult(
-        50.0, LoadMethod.RPE, None
-    )
-    # Sin RPE tampoco: el ritmo nunca cuenta en ciclismo.
-    assert activity_load(Sport.CYCLING, 3600, **no_hr) is None
+    assert activity_load(Sport.CYCLING, 3600, **no_hr, rpe=7) is None
 
 
 def test_running_uses_pace_first() -> None:
-    result = activity_load(Sport.RUNNING, 3600, **EVERYTHING, rpe=50.0)
+    result = activity_load(Sport.RUNNING, 3600, **EVERYTHING, rpe=7)
     assert result is not None and result.method is LoadMethod.PACE
     assert result.load == pytest.approx((270 / (1000 / 3.5)) ** 2 * 100)
 
@@ -149,12 +149,9 @@ def test_running_without_valid_pace_falls_back_to_hr(missing: dict[str, None]) -
     assert result.load == pytest.approx((150 / 170) ** 2 * 100)
 
 
-def test_running_without_pace_and_hr_falls_back_to_rpe_or_none() -> None:
+def test_running_without_pace_and_hr_has_no_load_even_with_rpe() -> None:
     nothing = {**EVERYTHING, "avg_speed_mps": None, "avg_hr_bpm": None}
-    assert activity_load(Sport.RUNNING, 3600, **nothing, rpe=40.0) == LoadResult(
-        40.0, LoadMethod.RPE, None
-    )
-    assert activity_load(Sport.RUNNING, 3600, **nothing) is None
+    assert activity_load(Sport.RUNNING, 3600, **nothing, rpe=7) is None
 
 
 def test_trail_uses_hr_never_power_or_pace() -> None:
@@ -168,36 +165,74 @@ def test_trail_with_pace_but_without_hr_does_not_use_pace() -> None:
     assert activity_load(Sport.TRAIL_RUNNING, 3600, **{**EVERYTHING, "lthr_bpm": None}) is None
 
 
-def test_trail_without_hr_falls_back_to_rpe() -> None:
-    no_hr = {**EVERYTHING, "avg_hr_bpm": None}
-    result = activity_load(Sport.TRAIL_RUNNING, 3600, **no_hr, rpe=72.0)
-    assert result == LoadResult(72.0, LoadMethod.RPE, None)
-    # Con FC, la FC manda.
-    result = activity_load(Sport.TRAIL_RUNNING, 3600, **EVERYTHING, rpe=72.0)
-    assert result is not None and result.method is LoadMethod.HEART_RATE
-
-
-def test_trail_without_hr_and_without_rpe_has_no_load() -> None:
+def test_trail_without_hr_and_without_rpe_formula_has_no_load() -> None:
     assert activity_load(Sport.TRAIL_RUNNING, 3600, avg_speed_mps=3.0) is None
+    assert activity_load(Sport.TRAIL_RUNNING, 3600, avg_speed_mps=3.0, rpe=8) is None
 
 
-@pytest.mark.parametrize("sport", [Sport.HIKING, Sport.STRENGTH, Sport.SWIMMING, Sport.OTHER])
+def test_endurance_rpe_step_is_pending_a_formula() -> None:
+    for sport in (Sport.CYCLING, Sport.RUNNING, Sport.TRAIL_RUNNING):
+        assert LOAD_RULES[sport].methods[-1] is LoadMethod.RPE
+        assert activity_load(sport, 3600, rpe=10) is None
+
+
+@pytest.mark.parametrize("sport", [Sport.HIKING, Sport.SWIMMING, Sport.OTHER])
 def test_other_sports_keep_hr_load_only(sport: Sport) -> None:
-    result = activity_load(sport, 3600, **EVERYTHING, rpe=50.0)
+    result = activity_load(sport, 3600, **EVERYTHING, rpe=7)
     assert result is not None and result.method is LoadMethod.HEART_RATE
-    assert activity_load(sport, 3600, **{**EVERYTHING, "avg_hr_bpm": None}, rpe=50.0) is None
+    assert activity_load(sport, 3600, **{**EVERYTHING, "avg_hr_bpm": None}, rpe=7) is None
 
 
-def test_rpe_load() -> None:
-    assert rpe_load(None) is None
-    assert rpe_load(0.0) == LoadResult(0.0, LoadMethod.RPE, None)
+# --- Fuerza: session RPE --------------------------------------------------------------------
+
+
+def test_strength_with_hr_and_without_rpe_has_no_load() -> None:
+    assert activity_load(Sport.STRENGTH, 3600, **EVERYTHING) is None
+
+
+def test_strength_with_rpe_is_minutes_times_rpe() -> None:
+    result = activity_load(Sport.STRENGTH, 3600, **EVERYTHING, rpe=7)
+    assert result == LoadResult(420.0, LoadMethod.SESSION_RPE, None)
+    # Sin tiempo en movimiento, el total.
+    result = activity_load(Sport.STRENGTH, None, elapsed_s=2700, rpe=6)
+    assert result == LoadResult(270.0, LoadMethod.SESSION_RPE, None)
+    assert activity_load(Sport.STRENGTH, None, rpe=6) is None
+
+
+def test_session_rpe_load_validates() -> None:
+    assert session_rpe_load(3600, None) is None
+    assert session_rpe_load(None, 5) is None
+    assert session_rpe_load(0, 5) == LoadResult(0.0, LoadMethod.SESSION_RPE, None)
+    for bad in (0, 11):
+        with pytest.raises(ValueError):
+            session_rpe_load(3600, bad)
     with pytest.raises(ValueError):
-        rpe_load(-1)
+        session_rpe_load(-1, 5)
+
+
+def test_session_rpe_is_never_used_outside_strength() -> None:
+    for sport, rule in LOAD_RULES.items():
+        assert (LoadMethod.SESSION_RPE in rule.methods) is (sport is Sport.STRENGTH)
+
+
+def test_only_endurance_counts_in_daily_load() -> None:
+    for sport in (Sport.CYCLING, Sport.RUNNING, Sport.TRAIL_RUNNING):
+        assert counts_in_daily_load(sport, LoadMethod.POWER)
+        assert not counts_in_daily_load(sport, LoadMethod.SESSION_RPE)
+    # Una carga TSS antigua de fuerza tampoco suma.
+    assert not counts_in_daily_load(Sport.STRENGTH, LoadMethod.HEART_RATE)
+    assert not counts_in_daily_load(Sport.STRENGTH, LoadMethod.SESSION_RPE)
+
+
+def test_every_sport_has_a_rule() -> None:
+    assert set(LOAD_RULES) == set(Sport)
+    assert Activity.__table__.c.rpe is not None
 
 
 def test_no_method_available() -> None:
     for sport in Sport:
         assert activity_load(sport, 3600) is None
+        assert activity_load(sport, None) is None
 
 
 def test_activity_load_validates_duration() -> None:

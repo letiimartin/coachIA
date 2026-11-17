@@ -9,9 +9,12 @@ actividades). No hace commit: lo hace quien llama.
 
 Criterios:
 - El día de una actividad es el local en la zona horaria del atleta.
-- Duración: `moving_s`. Sin ella no hay carga (no se inventa).
-- El método de carga va por disciplina (`app.metrics.load.activity_load`) y el LTHR de cada
-  deporte sale de `app.metrics.zones.lthr_field_for`.
+- Duración: `moving_s` en los métodos TSS (sin ella no hay carga; no se inventa). La fuerza usa
+  `moving_s` o, si no hay, `elapsed_s`.
+- El método de carga va por deporte (`app.metrics.load.LOAD_RULES`) y el LTHR de cada deporte
+  sale de `app.metrics.zones.lthr_field_for`.
+- La carga diaria sólo suma resistencia (`counts_in_daily_load`): la fuerza (`strength`, y
+  cualquier carga `session_rpe`) no suma nunca, aunque conserve una carga TSS antigua.
 - Las actividades marcadas como duplicadas (`duplicate_of_id`) tienen su carga, pero no suman
   en la carga diaria. Las de carga por RPE (manual) no se recalculan.
 
@@ -36,7 +39,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.metrics.fitness import FitnessDay, fitness_series
-from app.metrics.load import LoadResult, activity_load
+from app.metrics.load import LoadResult, activity_load, counts_in_daily_load
 from app.metrics.zones import lthr_field_for
 from app.models import Activity, AthleteThreshold, DailyLoad, LoadMethod
 from app.services.athletes import athlete_timezone, today_for
@@ -96,18 +99,22 @@ def compute_activity_load(
 
     Las cargas por RPE (manuales) no se calculan aquí: quien llama las conserva.
     """
-    if threshold is None or activity.moving_s is None:
-        return None
     sport = activity.sport
+
+    def limit(name: str) -> float | None:
+        return None if threshold is None else _float(getattr(threshold, name))
+
     return activity_load(
         sport,
-        activity.moving_s,
+        _float(activity.moving_s),
+        elapsed_s=_float(activity.elapsed_s),
         normalized_power_w=_float(activity.normalized_power_w),
-        ftp_w=_float(threshold.ftp_w),
+        ftp_w=limit("ftp_w"),
         avg_hr_bpm=_float(activity.avg_hr),
-        lthr_bpm=_float(getattr(threshold, lthr_field_for(sport))),
+        lthr_bpm=limit(lthr_field_for(sport)),
         avg_speed_mps=_float(activity.avg_speed_mps),
-        threshold_pace_s_per_km=_float(threshold.threshold_pace_s_per_km),
+        threshold_pace_s_per_km=limit("threshold_pace_s_per_km"),
+        rpe=activity.rpe,
     )
 
 
@@ -227,7 +234,11 @@ def recompute_from(
         day = _local_day(activity.start_at, tz)
         if not _keeps_current_load(activity, overwrite_existing=overwrite_existing):
             _apply_load(activity, compute_activity_load(activity, thresholds.on(day)))
-        if activity.duplicate_of_id is None and activity.load is not None:
+        if (
+            activity.duplicate_of_id is None
+            and activity.load is not None
+            and counts_in_daily_load(activity.sport, activity.load_method)
+        ):
             daily[day] += float(activity.load)
 
     # `start` > `end` si `since` es futuro (p. ej. un umbral que entra en vigor mañana).

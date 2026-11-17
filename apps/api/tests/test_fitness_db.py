@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import TokenVerifier
@@ -415,6 +416,88 @@ def test_simulation_reports_changes_without_writing(
         None,
         Decimal("10.0"),
     )
+
+
+# --- Fuerza: session RPE, fuera de la carga diaria ---------------------------------------------
+
+
+def _gym(user_id: uuid.UUID, day: date, **extra: Any) -> Activity:
+    values: dict[str, Any] = {
+        "sport": Sport.STRENGTH,
+        "np_w": 0,
+        "avg_hr": 130,
+        **extra,
+    }
+    return _ride(user_id, day, **values)
+
+
+def test_strength_load_is_session_rpe_and_never_counts_in_daily_load(
+    session: Session, athlete_id: uuid.UUID
+) -> None:
+    session.add(_threshold(athlete_id, D0, ftp_w=250, running_lthr_bpm=170, cycling_lthr_bpm=165))
+    ride = _ride(athlete_id, D0)
+    with_rpe = _gym(athlete_id, D0, rpe=7)
+    # Con FC pero sin RPE: sin carga (la FC nunca cuenta en fuerza).
+    without_rpe = _gym(athlete_id, D0 + timedelta(days=1))
+    # Sin tiempo en movimiento: el total.
+    elapsed_only = _gym(athlete_id, D0 + timedelta(days=2), moving_s=0, elapsed_s=1800, rpe=5)
+    elapsed_only.moving_s = None
+    session.add_all([ride, with_rpe, without_rpe, elapsed_only])
+    session.flush()
+
+    fitness.recompute_from(session, athlete_id, D0, today=TODAY)
+
+    assert (with_rpe.load, with_rpe.load_method, with_rpe.intensity_factor) == (
+        Decimal("420.0"),
+        LoadMethod.SESSION_RPE,
+        None,
+    )
+    assert (without_rpe.load, without_rpe.load_method) == (None, None)
+    assert (elapsed_only.load, elapsed_only.load_method) == (
+        Decimal("150.0"),
+        LoadMethod.SESSION_RPE,
+    )
+    # CTL/ATL sólo con la bici.
+    series = _series(session, athlete_id)
+    assert [row[1] for row in series[:3]] == [Decimal(v) for v in ("64.0", "0.0", "0.0")]
+    expected = fitness_series({D0: 64.0}, start=D0, end=TODAY)
+    assert [float(row[2]) for row in series] == pytest.approx([d.ctl for d in expected], abs=1e-3)
+
+
+def test_old_strength_tss_is_kept_but_not_counted_and_simulation_replaces_it(
+    session: Session, athlete_id: uuid.UUID
+) -> None:
+    session.add(_threshold(athlete_id, D0, running_lthr_bpm=170))
+    old = _gym(athlete_id, D0, load=Decimal("50.0"), load_method=LoadMethod.HEART_RATE, rpe=6)
+    old_no_rpe = _gym(
+        athlete_id, D0 + timedelta(days=1), load=Decimal("40.0"), load_method=LoadMethod.HEART_RATE
+    )
+    session.add_all([old, old_no_rpe])
+    session.commit()
+
+    # Protección: el gancho automático no la borra ni la cambia, pero ya no suma.
+    fitness.recompute_from(session, athlete_id, D0, today=TODAY)
+    assert (old.load, old.load_method) == (Decimal("50.0"), LoadMethod.HEART_RATE)
+    assert {row[1] for row in _series(session, athlete_id)} == {Decimal("0.0")}
+    session.commit()
+
+    changes = fitness.simulate_recompute(session, athlete_id)
+    assert [(c.activity_id, c.old_method, c.new_load, c.new_method) for c in changes] == [
+        (old.id, LoadMethod.HEART_RATE, Decimal("360.0"), LoadMethod.SESSION_RPE),
+        (old_no_rpe.id, LoadMethod.HEART_RATE, None, None),
+    ]
+
+    fitness.recompute_from(session, athlete_id, date.min, today=TODAY, overwrite_existing=True)
+    assert (old.load, old.load_method) == (Decimal("360.0"), LoadMethod.SESSION_RPE)
+    assert (old_no_rpe.load, old_no_rpe.load_method) == (None, None)
+    assert {row[1] for row in _series(session, athlete_id)} == {Decimal("0.0")}
+
+
+def test_activity_rpe_check(session: Session, athlete_id: uuid.UUID) -> None:
+    for bad in (0, 11):
+        with pytest.raises(IntegrityError), session.begin_nested():
+            session.add(_gym(athlete_id, D0, rpe=bad))
+            session.flush()
 
 
 # --- Lectura de la serie -----------------------------------------------------------------------

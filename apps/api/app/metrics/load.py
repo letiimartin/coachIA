@@ -23,18 +23,22 @@ el IF devuelto es ``None``, porque es una aproximación que no equivale al IF de
 publicarlo con otro método basta con añadirlo a ``INTENSITY_FACTOR_METHODS`` (o darle su propio
 cálculo en ``intensity_factor_for``) sin tocar el resto.
 
-El método se elige por disciplina (``activity_load``), no con un orden único para todas:
+El método se elige por deporte con una sola tabla, ``LOAD_RULES``: cada deporte tiene sus
+métodos en orden de preferencia y dice si su carga suma en la carga diaria (CTL/ATL/TSB).
 
 - Ciclismo: potencia → FC sobre el LTHR de ciclismo → RPE.
 - Carrera: ritmo → FC sobre el LTHR de carrera (p. ej. en cinta sin sensor) → RPE.
 - Trail: FC sobre el LTHR de carrera → RPE. El ritmo **nunca** se usa en trail: el desnivel
   lo invalida.
-- Resto de deportes (senderismo, fuerza, natación, otros): FC, como antes (ni potencia ni
-  ritmo ni RPE). Qué LTHR usa cada deporte lo decide ``app.metrics.zones.lthr_field_for``.
+- Fuerza (``strength``): sólo ``session_rpe`` = minutos × RPE de la sesión (Foster), nunca
+  potencia, ritmo ni FC. No es TSS y no suma en la carga diaria.
+- Senderismo, natación y otros: FC, como antes. Qué LTHR usa cada deporte lo decide
+  ``app.metrics.zones.lthr_field_for``.
 
-RPE: mientras no haya una fuente de RPE por actividad ni una fórmula RPE → TSS aprobada, sólo
-se conservan las cargas por RPE que ya existen (introducidas a mano); nunca se inventa una.
-Sin datos suficientes la carga es ``None``. ``LoadResult.method`` dice siempre qué se usó.
+El paso RPE de resistencia (estimación de TSS a partir del RPE) no tiene todavía una fórmula
+aprobada: devuelve ``None``. Las cargas por RPE ya guardadas (manuales) las conserva quien
+llama. Sin datos suficientes la carga es ``None``. ``LoadResult.method`` dice siempre qué se
+usó.
 
 Las funciones devuelven ``None`` cuando falta el dato o el umbral (o no es positivo): no se
 inventa carga. Una duración de 0 da carga 0. Valores negativos o no finitos son un error.
@@ -42,6 +46,7 @@ inventa carga. Una duración de 0 da carga 0. Valores negativos o no finitos son
 
 import math
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import NamedTuple, TypeGuard
 
 from app.models.activity import LoadMethod
@@ -130,47 +135,124 @@ def pace_s_per_km(speed_mps: float | None) -> float | None:
     return None
 
 
-def rpe_load(load: float | None) -> LoadResult | None:
-    """Carga por RPE ya registrada (manual): se conserva tal cual, sin IF."""
-    if load is None:
+def session_rpe_load(duration_s: float | None, rpe: int | None) -> LoadResult | None:
+    """Carga de una sesión de fuerza: ``minutos × RPE`` (1-10). ``None`` sin RPE o sin tiempo."""
+    if rpe is None or duration_s is None:
         return None
-    if not math.isfinite(load) or load < 0:
-        raise ValueError("los datos y umbrales deben ser números no negativos")
-    return LoadResult(load, LoadMethod.RPE, None)
+    _check_duration(duration_s)
+    if not 1 <= rpe <= 10:
+        raise ValueError("el RPE debe estar entre 1 y 10")
+    return LoadResult(duration_s / 60.0 * rpe, LoadMethod.SESSION_RPE, None)
+
+
+@dataclass(frozen=True, slots=True)
+class LoadInputs:
+    """Datos de la actividad y umbrales que corresponden a su deporte."""
+
+    moving_s: float | None
+    elapsed_s: float | None = None
+    normalized_power_w: float | None = None
+    ftp_w: float | None = None
+    avg_hr_bpm: float | None = None
+    lthr_bpm: float | None = None
+    avg_speed_mps: float | None = None
+    threshold_pace_s_per_km: float | None = None
+    rpe: int | None = None
+
+
+def _with_moving(
+    compute: Callable[[float, LoadInputs], LoadResult | None],
+) -> Callable[[LoadInputs], LoadResult | None]:
+    """Los métodos TSS usan el tiempo en movimiento; sin él no hay carga."""
+
+    def run(inputs: LoadInputs) -> LoadResult | None:
+        return None if inputs.moving_s is None else compute(inputs.moving_s, inputs)
+
+    return run
+
+
+# Cálculo de cada método. Uno que devuelve None no está disponible y se pasa al siguiente.
+_METHODS: Mapping[LoadMethod, Callable[[LoadInputs], LoadResult | None]] = {
+    LoadMethod.POWER: _with_moving(lambda s, i: power_tss(s, i.normalized_power_w, i.ftp_w)),
+    LoadMethod.HEART_RATE: _with_moving(lambda s, i: hr_tss(s, i.avg_hr_bpm, i.lthr_bpm)),
+    LoadMethod.PACE: _with_moving(
+        lambda s, i: run_tss(s, pace_s_per_km(i.avg_speed_mps), i.threshold_pace_s_per_km)
+    ),
+    # RPE → TSS de resistencia: sin fórmula aprobada (#22), nunca se inventa.
+    LoadMethod.RPE: lambda inputs: None,
+    # Fuerza: tiempo en movimiento o, si no hay, el total.
+    LoadMethod.SESSION_RPE: lambda i: session_rpe_load(
+        i.moving_s if i.moving_s is not None else i.elapsed_s, i.rpe
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class SportLoadRule:
+    """Métodos de carga de un deporte, en orden de preferencia, y si suma en CTL/ATL."""
+
+    methods: tuple[LoadMethod, ...]
+    endurance: bool
+
+
+_ENDURANCE_HR = SportLoadRule((LoadMethod.HEART_RATE,), endurance=True)
+
+# Única correspondencia deporte → métodos. Una disciplina nueva sólo añade una entrada.
+# Senderismo, natación y otros siguen como antes (FC y suman); pendiente de decisión (#22).
+LOAD_RULES: Mapping[Sport, SportLoadRule] = {
+    Sport.CYCLING: SportLoadRule(
+        (LoadMethod.POWER, LoadMethod.HEART_RATE, LoadMethod.RPE), endurance=True
+    ),
+    Sport.RUNNING: SportLoadRule(
+        (LoadMethod.PACE, LoadMethod.HEART_RATE, LoadMethod.RPE), endurance=True
+    ),
+    Sport.TRAIL_RUNNING: SportLoadRule((LoadMethod.HEART_RATE, LoadMethod.RPE), endurance=True),
+    Sport.STRENGTH: SportLoadRule((LoadMethod.SESSION_RPE,), endurance=False),
+    Sport.HIKING: _ENDURANCE_HR,
+    Sport.SWIMMING: _ENDURANCE_HR,
+    Sport.OTHER: _ENDURANCE_HR,
+}
+
+
+def counts_in_daily_load(sport: Sport, method: LoadMethod | None) -> bool:
+    """La carga diaria (CTL/ATL/TSB) sólo suma resistencia, y nunca ``session_rpe``."""
+    return LOAD_RULES[sport].endurance and method is not LoadMethod.SESSION_RPE
 
 
 def activity_load(
     sport: Sport,
-    duration_s: float,
+    moving_s: float | None,
     *,
+    elapsed_s: float | None = None,
     normalized_power_w: float | None = None,
     ftp_w: float | None = None,
     avg_hr_bpm: float | None = None,
     lthr_bpm: float | None = None,
     avg_speed_mps: float | None = None,
     threshold_pace_s_per_km: float | None = None,
-    rpe: float | None = None,
+    rpe: int | None = None,
 ) -> LoadResult | None:
-    """Carga de una actividad con el método de su disciplina (ver el docstring del módulo).
+    """Carga con el primer método disponible de ``LOAD_RULES[sport]`` (ver el módulo).
 
-    ``lthr_bpm`` es el LTHR que corresponde al deporte (``lthr_field_for``) y ``rpe`` una carga
-    por RPE ya registrada. Un método está disponible si tiene a la vez el dato de la actividad y
-    el umbral. Devuelve ``None`` si el de la disciplina no lo está. La duración la elige quien
-    llama (normalmente ``moving_s``).
+    ``lthr_bpm`` es el LTHR que corresponde al deporte (``lthr_field_for``) y ``rpe`` el RPE de
+    la sesión (1-10). Un método está disponible si tiene a la vez el dato de la actividad y el
+    umbral. Devuelve ``None`` si ninguno lo está.
     """
-    _check_duration(duration_s)
-    if sport is Sport.CYCLING:
-        return (
-            power_tss(duration_s, normalized_power_w, ftp_w)
-            or hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
-            or rpe_load(rpe)
-        )
-    if sport is Sport.RUNNING:
-        return (
-            run_tss(duration_s, pace_s_per_km(avg_speed_mps), threshold_pace_s_per_km)
-            or hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
-            or rpe_load(rpe)
-        )
-    if sport is Sport.TRAIL_RUNNING:
-        return hr_tss(duration_s, avg_hr_bpm, lthr_bpm) or rpe_load(rpe)
-    return hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
+    if moving_s is not None:
+        _check_duration(moving_s)
+    inputs = LoadInputs(
+        moving_s,
+        elapsed_s,
+        normalized_power_w,
+        ftp_w,
+        avg_hr_bpm,
+        lthr_bpm,
+        avg_speed_mps,
+        threshold_pace_s_per_km,
+        rpe,
+    )
+    for method in LOAD_RULES[sport].methods:
+        result = _METHODS[method](inputs)
+        if result is not None:
+            return result
+    return None

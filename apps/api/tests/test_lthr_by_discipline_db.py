@@ -1,7 +1,8 @@
-"""LTHR por disciplina (#22): migración sin repartir los valores antiguos y su asignación."""
+"""Migración de #22 (LTHR por disciplina, `rpe` y `session_rpe`) y asignación del LTHR antiguo."""
 
 import uuid
 from collections.abc import Iterator
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,16 @@ def migrated_user(engine: Engine, alembic_config: Config) -> Iterator[uuid.UUID]
                     "INSERT INTO athlete_thresholds (user_id, effective_from, lthr_bpm, ftp_w)"
                     " VALUES (:u, '2026-01-01', 168, 230), (:u, '2026-06-01', 177, NULL),"
                     " (:u, '2026-09-01', NULL, 240)"
+                ),
+                {"u": user},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO activities (user_id, source, external_id, sport, start_at,"
+                    " moving_s, load, load_method) VALUES"
+                    " (:u, 'wahoo', 'a1', 'cycling', '2026-02-01T08:00Z', 3600, 64.0, 'power'),"
+                    " (:u, 'wahoo', 'a2', 'strength', '2026-02-02T08:00Z', 3600, 50.0,"
+                    " 'heart_rate')"
                 ),
                 {"u": user},
             )
@@ -134,6 +145,74 @@ def test_lthr_columns_have_the_same_check(
             ),
             {"u": athlete_id, "v": value},
         )
+
+
+def _activity_loads(engine: Engine, user: uuid.UUID) -> list[tuple[object, ...]]:
+    with engine.connect() as conn:
+        return [
+            tuple(row)
+            for row in conn.execute(
+                text(
+                    "SELECT external_id, load, load_method FROM activities"
+                    " WHERE user_id = :u ORDER BY external_id"
+                ),
+                {"u": user},
+            )
+        ]
+
+
+def test_migration_adds_rpe_and_session_rpe_keeping_existing_loads(
+    engine: Engine, alembic_config: Config, migrated_user: uuid.UUID
+) -> None:
+    # Las cargas existentes no cambian (tampoco la TSS antigua de fuerza).
+    assert _activity_loads(engine, migrated_user) == [
+        ("a1", Decimal("64.0"), "power"),
+        ("a2", Decimal("50.0"), "heart_rate"),
+    ]
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO activities (user_id, source, external_id, sport, start_at, rpe,"
+                " load, load_method) VALUES"
+                " (:u, 'manual', 'a3', 'strength', '2026-02-03T08:00Z', 7, 420.0, 'session_rpe')"
+            ),
+            {"u": migrated_user},
+        )
+        with pytest.raises(IntegrityError), conn.begin_nested():
+            conn.execute(
+                text(
+                    "UPDATE activities SET load_method = 'inventado'"
+                    " WHERE user_id = :u AND external_id = 'a3'"
+                ),
+                {"u": migrated_user},
+            )
+
+    # Downgrade con datos: la carga session_rpe se vacía (su origen, rpe, desaparece).
+    command.downgrade(alembic_config, BEFORE)
+    with engine.connect() as conn:
+        activity_columns = set(
+            conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_schema = 'public' AND table_name = 'activities'"
+                )
+            ).scalars()
+        )
+    assert "rpe" not in activity_columns
+    assert _activity_loads(engine, migrated_user) == [
+        ("a1", Decimal("64.0"), "power"),
+        ("a2", Decimal("50.0"), "heart_rate"),
+        ("a3", None, None),
+    ]
+    with engine.begin() as conn, pytest.raises(IntegrityError):
+        conn.execute(
+            text(
+                "UPDATE activities SET load_method = 'session_rpe'"
+                " WHERE user_id = :u AND external_id = 'a3'"
+            ),
+            {"u": migrated_user},
+        )
+    command.upgrade(alembic_config, REVISION)
 
 
 # --- Asignación revisable de los valores antiguos ---------------------------------------------
