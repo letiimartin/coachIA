@@ -5,11 +5,11 @@ exponenciales de la carga diaria.
 
     CTL_hoy = CTL_ayer + (carga_hoy − CTL_ayer) / 42
     ATL_hoy = ATL_ayer + (carga_hoy − ATL_ayer) / 7
-    TSB_hoy = CTL_hoy − ATL_hoy
+    TSB_hoy = CTL_ayer − ATL_ayer
 
-Se usa ``TSB = CTL − ATL`` del mismo día, después de sumar la carga de ese día (como
-intervals.icu). TrainingPeaks muestra la forma de hoy con los valores de ayer; se obtiene
-leyendo el TSB del día anterior.
+El TSB se calcula con la CTL y la ATL del día anterior (criterio de TrainingPeaks, decisión
+de #17): es la frescura con la que se empieza el día, antes de entrenar. intervals.icu usa en
+cambio los valores del mismo día.
 
 La serie es diaria y continua: los días sin actividad cuentan con carga 0, que es lo que hace
 caer CTL y ATL en el descanso.
@@ -65,7 +65,8 @@ def fitness_series(
     ``daily_load`` es la carga total de cada día (la suma de sus actividades). Por defecto el
     rango va del primer al último día con carga; los días de ``daily_load`` fuera del rango se
     ignoran, y la historia anterior se resume en ``initial_ctl`` e ``initial_atl`` (el estado
-    al final del día anterior a ``start``). Sin datos ni rango devuelve una lista vacía.
+    al final del día anterior a ``start``), que también da el TSB del primer día. Sin datos ni
+    rango devuelve una lista vacía.
     """
     if ctl_days <= 0 or atl_days <= 0:
         raise ValueError("las constantes de tiempo deben ser positivas")
@@ -78,7 +79,8 @@ def fitness_series(
     ctl, atl = initial_ctl, initial_atl
     result: list[FitnessDay] = []
     for day, load in fill_daily_load(daily_load, start, end):
+        tsb = ctl - atl  # Valores del día anterior (TrainingPeaks).
         ctl += (load - ctl) / ctl_days
         atl += (load - atl) / atl_days
-        result.append(FitnessDay(day, load, ctl, atl, ctl - atl))
+        result.append(FitnessDay(day, load, ctl, atl, tsb))
     return result

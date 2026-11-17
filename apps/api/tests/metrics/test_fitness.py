@@ -13,7 +13,7 @@ def test_single_day_from_zero() -> None:
     assert day.day == D0
     assert day.ctl == pytest.approx(100 / 42)
     assert day.atl == pytest.approx(100 / 7)
-    assert day.tsb == pytest.approx(100 / 42 - 100 / 7)
+    assert day.tsb == 0.0  # TSB con los valores del día anterior (aún sin historia).
 
 
 def test_gaps_are_filled_with_zero() -> None:
@@ -36,10 +36,18 @@ def test_constant_load_converges_to_that_load() -> None:
 
 def test_known_values_after_a_week() -> None:
     loads = {D0 + timedelta(days=i): 100.0 for i in range(7)}
-    last = fitness_series(loads)[-1]
+    series = fitness_series(loads)
+    last = series[-1]
     assert last.ctl == pytest.approx(100 * (1 - (41 / 42) ** 7))
     assert last.atl == pytest.approx(100 * (1 - (6 / 7) ** 7))
-    assert last.tsb == pytest.approx(last.ctl - last.atl)
+    previous = series[-2]
+    assert last.tsb == pytest.approx(previous.ctl - previous.atl)
+
+
+def test_tsb_uses_previous_day_values() -> None:
+    series = fitness_series({D0: 100.0, D0 + timedelta(days=1): 0.0})
+    assert series[0].tsb == 0.0
+    assert series[1].tsb == pytest.approx(series[0].ctl - series[0].atl)
 
 
 def test_explicit_range_and_initial_state() -> None:
@@ -54,7 +62,8 @@ def test_explicit_range_and_initial_state() -> None:
     assert [d.load for d in series] == [0.0, 0.0]  # La carga fuera del rango se ignora.
     assert series[0].ctl == pytest.approx(41.0)
     assert series[0].atl == pytest.approx(60.0)
-    assert series[0].tsb == pytest.approx(-19.0)
+    assert series[0].tsb == pytest.approx(42.0 - 70.0)  # Estado inicial (día anterior).
+    assert series[1].tsb == pytest.approx(41.0 - 60.0)
 
 
 def test_empty_series() -> None:

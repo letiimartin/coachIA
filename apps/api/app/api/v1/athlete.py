@@ -59,7 +59,7 @@ def get_current_threshold(
     ] = None,
 ) -> CurrentThresholdOut:
     """Umbral vigente en la fecha y zonas calculadas a partir de él. 404 si no hay ninguno."""
-    on = on or thresholds.today_for(db, user.id)
+    on = on or athletes.today_for(db, user.id)
     threshold = thresholds.current_threshold(db, user.id, on)
     return CurrentThresholdOut(
         on=on,

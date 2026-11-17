@@ -7,6 +7,9 @@
 - `integrations.sync_cursor` guarda el inicio más reciente importado. Los syncs siguientes paran
   al llegar a workouts que empezaron antes de ese inicio menos un margen (`INCREMENTAL_OVERLAP`),
   para recoger también workouts subidos o editados con retraso.
+- Al terminar, recalcula la carga y la forma (`services.fitness.recompute_from`) desde el día
+  de la actividad más antigua creada o modificada (backfill incluido); si no cambió nada, sólo
+  completa la serie hasta hoy.
 - 401/403 de Wahoo → la integración pasa a `error` (hay que reconectar). Límites (429), red o
   5xx son transitorios: se guarda `last_error` sin cambiar el estado y el cursor no avanza.
 """
@@ -38,6 +41,7 @@ from app.integrations.wahoo.mapper import (
     parse_datetime,
 )
 from app.models import Activity, ActivitySource, Integration, IntegrationStatus, Provider
+from app.services import fitness
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,7 @@ def sync_user(
     stop_before = previous_latest - INCREMENTAL_OVERLAP if previous_latest else None
     result = SyncResult()
     latest = previous_latest
+    earliest_changed: datetime | None = None
 
     try:
         page = 1
@@ -108,8 +113,13 @@ def sync_user(
                 except WahooMappingError as exc:
                     logger.warning("Workout de Wahoo omitido: %s", exc)
                     continue
-                result.add(_upsert(session, user_id, mapped))
+                outcome = _upsert(session, user_id, mapped)
+                result.add(outcome)
                 start_at: datetime = mapped.values["start_at"]
+                if outcome != "unchanged" and (
+                    earliest_changed is None or start_at < earliest_changed
+                ):
+                    earliest_changed = start_at
                 latest = start_at if latest is None else max(latest, start_at)
             session.commit()  # Lo importado se conserva aunque falle una página posterior.
 
@@ -129,6 +139,10 @@ def sync_user(
         _record_error(session, integration, str(exc), status=None)
         raise
 
+    if earliest_changed is not None:
+        fitness.recompute_since_activity(session, user_id, earliest_changed)
+    else:
+        fitness.extend_to_today(session, user_id)
     integration.last_sync_at = _now()
     integration.last_error = None
     if latest is not None:
