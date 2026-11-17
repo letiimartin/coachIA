@@ -60,6 +60,10 @@ class AthleteThreshold(TimestampMixin, Base):
     """Umbrales con fecha de vigencia: el TSS de marzo se calcula con el FTP de marzo.
 
     Las zonas no se guardan: se calculan a partir del umbral vigente y del modelo de zonas.
+
+    Hay un LTHR por disciplina (`cycling_lthr_bpm`, `running_lthr_bpm`). `legacy_lthr_bpm` es
+    el LTHR único anterior a #22: se conserva para que la autora decida a qué disciplina
+    pertenecía cada valor, pero ningún cálculo lo usa.
     """
 
     __tablename__ = "athlete_thresholds"
@@ -68,7 +72,9 @@ class AthleteThreshold(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = user_fk()
     effective_from: Mapped[date]
     ftp_w: Mapped[int | None]
-    lthr_bpm: Mapped[int | None]
+    cycling_lthr_bpm: Mapped[int | None]
+    running_lthr_bpm: Mapped[int | None]
+    legacy_lthr_bpm: Mapped[int | None]
     hr_max_bpm: Mapped[int | None]
     hr_rest_bpm: Mapped[int | None]
     threshold_pace_s_per_km: Mapped[Decimal | None] = mapped_column(sa.Numeric(6, 1))
@@ -82,7 +88,15 @@ class AthleteThreshold(TimestampMixin, Base):
     __table_args__ = (
         sa.UniqueConstraint("user_id", "effective_from"),
         sa.CheckConstraint("ftp_w IS NULL OR ftp_w BETWEEN 50 AND 700", name="ftp"),
-        sa.CheckConstraint("lthr_bpm IS NULL OR lthr_bpm BETWEEN 80 AND 230", name="lthr"),
+        sa.CheckConstraint(
+            "cycling_lthr_bpm IS NULL OR cycling_lthr_bpm BETWEEN 80 AND 230", name="cycling_lthr"
+        ),
+        sa.CheckConstraint(
+            "running_lthr_bpm IS NULL OR running_lthr_bpm BETWEEN 80 AND 230", name="running_lthr"
+        ),
+        sa.CheckConstraint(
+            "legacy_lthr_bpm IS NULL OR legacy_lthr_bpm BETWEEN 80 AND 230", name="legacy_lthr"
+        ),
         sa.CheckConstraint("hr_max_bpm IS NULL OR hr_max_bpm BETWEEN 100 AND 240", name="hr_max"),
         sa.CheckConstraint("hr_rest_bpm IS NULL OR hr_rest_bpm BETWEEN 25 AND 120", name="hr_rest"),
         sa.CheckConstraint("weight_kg IS NULL OR weight_kg BETWEEN 25 AND 250", name="weight"),

@@ -23,6 +23,16 @@ el IF devuelto es ``None``, porque es una aproximación que no equivale al IF de
 publicarlo con otro método basta con añadirlo a ``INTENSITY_FACTOR_METHODS`` (o darle su propio
 cálculo en ``intensity_factor_for``) sin tocar el resto.
 
+El método se elige por disciplina (``activity_load``), no con un orden único para todas:
+
+- Ciclismo: potencia y, si no hay, FC sobre el LTHR de ciclismo.
+- Carrera: ritmo. Sin ritmo válido no hay carga (``RUNNING_FALLS_BACK_TO_HR``, decisión
+  pendiente de la autora).
+- Trail: FC sobre el LTHR de carrera y, si no hay, la carga por RPE si existe. El ritmo
+  **nunca** se usa en trail: el desnivel lo invalida.
+- Resto de deportes (senderismo, fuerza, natación, otros): FC, como antes (ni potencia ni
+  ritmo). Qué LTHR usa cada deporte lo decide ``app.metrics.zones.lthr_field_for``.
+
 Las funciones devuelven ``None`` cuando falta el dato o el umbral (o no es positivo): no se
 inventa carga. Una duración de 0 da carga 0. Valores negativos o no finitos son un error.
 """
@@ -32,6 +42,7 @@ from collections.abc import Callable, Mapping
 from typing import NamedTuple, TypeGuard
 
 from app.models.activity import LoadMethod
+from app.models.common import Sport
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -116,7 +127,22 @@ def pace_s_per_km(speed_mps: float | None) -> float | None:
     return None
 
 
+# Carrera sin ritmo válido (p. ej. cinta sin sensor): ¿FC sobre el LTHR de carrera o sin carga?
+# Decisión abierta en #22; hasta entonces, sin alternativa.
+RUNNING_FALLS_BACK_TO_HR = False
+
+
+def rpe_load(load: float | None) -> LoadResult | None:
+    """Carga por RPE ya registrada (manual): se conserva tal cual, sin IF."""
+    if load is None:
+        return None
+    if not math.isfinite(load) or load < 0:
+        raise ValueError("los datos y umbrales deben ser números no negativos")
+    return LoadResult(load, LoadMethod.RPE, None)
+
+
 def activity_load(
+    sport: Sport,
     duration_s: float,
     *,
     normalized_power_w: float | None = None,
@@ -125,14 +151,25 @@ def activity_load(
     lthr_bpm: float | None = None,
     avg_speed_mps: float | None = None,
     threshold_pace_s_per_km: float | None = None,
+    rpe: float | None = None,
 ) -> LoadResult | None:
-    """Carga con el mejor método disponible: potencia > FC > ritmo.
+    """Carga de una actividad con el método de su disciplina (ver el docstring del módulo).
 
-    Un método está disponible si tiene a la vez el dato de la actividad y el umbral. Devuelve
-    ``None`` si ninguno lo está. La duración la elige quien llama (normalmente ``moving_s``).
+    ``lthr_bpm`` es el LTHR que corresponde al deporte (``lthr_field_for``) y ``rpe`` una carga
+    por RPE ya registrada. Un método está disponible si tiene a la vez el dato de la actividad y
+    el umbral. Devuelve ``None`` si el de la disciplina no lo está. La duración la elige quien
+    llama (normalmente ``moving_s``).
     """
-    return (
-        power_tss(duration_s, normalized_power_w, ftp_w)
-        or hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
-        or run_tss(duration_s, pace_s_per_km(avg_speed_mps), threshold_pace_s_per_km)
-    )
+    _check_duration(duration_s)
+    if sport is Sport.CYCLING:
+        return power_tss(duration_s, normalized_power_w, ftp_w) or hr_tss(
+            duration_s, avg_hr_bpm, lthr_bpm
+        )
+    if sport is Sport.RUNNING:
+        by_pace = run_tss(duration_s, pace_s_per_km(avg_speed_mps), threshold_pace_s_per_km)
+        if by_pace is None and RUNNING_FALLS_BACK_TO_HR:
+            return hr_tss(duration_s, avg_hr_bpm, lthr_bpm)
+        return by_pace
+    if sport is Sport.TRAIL_RUNNING:
+        return hr_tss(duration_s, avg_hr_bpm, lthr_bpm) or rpe_load(rpe)
+    return hr_tss(duration_s, avg_hr_bpm, lthr_bpm)

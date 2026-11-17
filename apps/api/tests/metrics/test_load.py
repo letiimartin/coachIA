@@ -9,9 +9,10 @@ from app.metrics.load import (
     intensity_factor_for,
     pace_s_per_km,
     power_tss,
+    rpe_load,
     run_tss,
 )
-from app.models import LoadMethod
+from app.models import LoadMethod, Sport
 
 
 def test_one_hour_at_threshold_is_100() -> None:
@@ -70,7 +71,7 @@ def test_intensity_factor_is_published_per_method() -> None:
 def test_zero_duration_gives_zero_load() -> None:
     result = power_tss(0, 200, 250)
     assert result == LoadResult(0.0, LoadMethod.POWER, pytest.approx(0.8))
-    assert activity_load(0, avg_hr_bpm=150, lthr_bpm=170) == LoadResult(
+    assert activity_load(Sport.CYCLING, 0, avg_hr_bpm=150, lthr_bpm=170) == LoadResult(
         0.0, LoadMethod.HEART_RATE, None
     )
 
@@ -105,31 +106,97 @@ def test_pace_from_speed() -> None:
     assert pace_s_per_km(0) is None
 
 
-def test_best_method_prefers_power_then_hr_then_pace() -> None:
-    everything = {
-        "normalized_power_w": 200,
-        "ftp_w": 250,
-        "avg_hr_bpm": 150,
-        "lthr_bpm": 170,
-        "avg_speed_mps": 3.5,
-        "threshold_pace_s_per_km": 270,
-    }
-    result = activity_load(3600, **everything)
+EVERYTHING = {
+    "normalized_power_w": 200,
+    "ftp_w": 250,
+    "avg_hr_bpm": 150,
+    "lthr_bpm": 170,
+    "avg_speed_mps": 3.5,
+    "threshold_pace_s_per_km": 270,
+}
+
+
+def test_cycling_uses_power_then_hr() -> None:
+    result = activity_load(Sport.CYCLING, 3600, **EVERYTHING)
     assert result is not None and result.method is LoadMethod.POWER
 
-    no_ftp = {**everything, "ftp_w": None}
-    result = activity_load(3600, **no_ftp)
+    no_ftp = {**EVERYTHING, "ftp_w": None}
+    result = activity_load(Sport.CYCLING, 3600, **no_ftp)
     assert result is not None and result.method is LoadMethod.HEART_RATE
+    assert result.load == pytest.approx((150 / 170) ** 2 * 100)
 
-    no_hr = {**no_ftp, "avg_hr_bpm": None}
-    result = activity_load(3600, **no_hr)
+    # Sin FC tampoco: el ritmo nunca cuenta en ciclismo.
+    assert activity_load(Sport.CYCLING, 3600, **{**no_ftp, "avg_hr_bpm": None}) is None
+
+
+def test_running_uses_pace_only() -> None:
+    result = activity_load(Sport.RUNNING, 3600, **EVERYTHING)
     assert result is not None and result.method is LoadMethod.PACE
     assert result.load == pytest.approx((270 / (1000 / 3.5)) ** 2 * 100)
 
 
-def test_best_method_none_available() -> None:
-    assert activity_load(3600) is None
-    assert activity_load(3600, normalized_power_w=200, avg_hr_bpm=150) is None
+def test_running_without_valid_pace_has_no_load() -> None:
+    # Decisión abierta (#22): de momento sin alternativa por FC.
+    for speed in (None, 0):
+        assert activity_load(Sport.RUNNING, 3600, **{**EVERYTHING, "avg_speed_mps": speed}) is None
+    assert (
+        activity_load(Sport.RUNNING, 3600, **{**EVERYTHING, "threshold_pace_s_per_km": None})
+        is None
+    )
+
+
+def test_running_hr_fallback_is_a_single_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.metrics.load.RUNNING_FALLS_BACK_TO_HR", True)
+    result = activity_load(Sport.RUNNING, 3600, **{**EVERYTHING, "avg_speed_mps": None})
+    assert result is not None and result.method is LoadMethod.HEART_RATE
+
+
+def test_trail_uses_hr_never_power_or_pace() -> None:
+    result = activity_load(Sport.TRAIL_RUNNING, 3600, **EVERYTHING)
+    assert result is not None and result.method is LoadMethod.HEART_RATE
+    assert result.load == pytest.approx((150 / 170) ** 2 * 100)
+
+
+def test_trail_with_pace_but_without_hr_does_not_use_pace() -> None:
+    assert activity_load(Sport.TRAIL_RUNNING, 3600, **{**EVERYTHING, "avg_hr_bpm": None}) is None
+    assert activity_load(Sport.TRAIL_RUNNING, 3600, **{**EVERYTHING, "lthr_bpm": None}) is None
+
+
+def test_trail_without_hr_falls_back_to_rpe() -> None:
+    no_hr = {**EVERYTHING, "avg_hr_bpm": None}
+    result = activity_load(Sport.TRAIL_RUNNING, 3600, **no_hr, rpe=72.0)
+    assert result == LoadResult(72.0, LoadMethod.RPE, None)
+    # Con FC, la FC manda.
+    result = activity_load(Sport.TRAIL_RUNNING, 3600, **EVERYTHING, rpe=72.0)
+    assert result is not None and result.method is LoadMethod.HEART_RATE
+
+
+def test_trail_without_hr_and_without_rpe_has_no_load() -> None:
+    assert activity_load(Sport.TRAIL_RUNNING, 3600, avg_speed_mps=3.0) is None
+
+
+@pytest.mark.parametrize("sport", [Sport.HIKING, Sport.STRENGTH, Sport.SWIMMING, Sport.OTHER])
+def test_other_sports_keep_hr_load_only(sport: Sport) -> None:
+    result = activity_load(sport, 3600, **EVERYTHING)
+    assert result is not None and result.method is LoadMethod.HEART_RATE
+    assert activity_load(sport, 3600, **{**EVERYTHING, "avg_hr_bpm": None}) is None
+
+
+def test_rpe_load() -> None:
+    assert rpe_load(None) is None
+    assert rpe_load(0.0) == LoadResult(0.0, LoadMethod.RPE, None)
+    with pytest.raises(ValueError):
+        rpe_load(-1)
+
+
+def test_no_method_available() -> None:
+    for sport in Sport:
+        assert activity_load(sport, 3600) is None
+
+
+def test_activity_load_validates_duration() -> None:
+    with pytest.raises(ValueError):
+        activity_load(Sport.RUNNING, -1)
 
 
 def test_result_unpacks_as_contract_tuple() -> None:

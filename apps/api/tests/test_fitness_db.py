@@ -99,7 +99,7 @@ def _full_recompute(session: Session, user_id: uuid.UUID) -> list[Any]:
 def test_recompute_fills_activity_load_and_continuous_series(
     session: Session, athlete_id: uuid.UUID
 ) -> None:
-    session.add(_threshold(athlete_id, D0, ftp_w=250, lthr_bpm=170))
+    session.add(_threshold(athlete_id, D0, ftp_w=250, cycling_lthr_bpm=170))
     session.add_all([_ride(athlete_id, D0), _ride(athlete_id, D0 + timedelta(days=2), np_w=250)])
     session.flush()
 
@@ -133,29 +133,48 @@ def test_load_uses_threshold_in_force_on_activity_date_and_sport(
 ) -> None:
     session.add_all(
         [
-            _threshold(athlete_id, D0, ftp_w=200, lthr_bpm=170),
-            _threshold(athlete_id, D0 + timedelta(days=5), ftp_w=250, lthr_bpm=170),
+            _threshold(
+                athlete_id,
+                D0,
+                ftp_w=200,
+                cycling_lthr_bpm=150,
+                running_lthr_bpm=170,
+                threshold_pace_s_per_km=250,
+            ),
+            _threshold(athlete_id, D0 + timedelta(days=5), ftp_w=250, running_lthr_bpm=170),
         ]
     )
     before = _ride(athlete_id, D0 + timedelta(days=4))
     after = _ride(athlete_id, D0 + timedelta(days=5))
-    # Carrera con potencia: el FTP es de bici, así que se usa la FC (sin IF publicado).
-    run = _ride(athlete_id, D0 + timedelta(days=6), sport=Sport.RUNNING, avg_hr=170)
+    # Ciclismo sin potencia: FC sobre el LTHR de ciclismo.
+    ride_hr = _ride(athlete_id, D0 + timedelta(days=4), np_w=0, avg_hr=150)
+    # Carrera con potencia y FC: sólo cuenta el ritmo (4 m/s = 250 s/km, el umbral).
+    run = _ride(athlete_id, D0 + timedelta(days=3), sport=Sport.RUNNING, avg_speed_mps=4)
+    # Trail con ritmo: sólo cuenta la FC sobre el LTHR de carrera.
+    trail = _ride(
+        athlete_id, D0 + timedelta(days=2), sport=Sport.TRAIL_RUNNING, avg_hr=170, avg_speed_mps=4
+    )
+    trail_no_hr = _ride(
+        athlete_id, D0 + timedelta(days=1), sport=Sport.TRAIL_RUNNING, avg_hr=None, avg_speed_mps=4
+    )
     # Sin moving_s no hay carga.
     no_moving = _ride(athlete_id, D0 + timedelta(days=7), moving_s=0)
     no_moving.moving_s = None
-    session.add_all([before, after, run, no_moving])
+    session.add_all([before, after, ride_hr, run, trail, trail_no_hr, no_moving])
     session.flush()
 
     fitness.recompute_from(session, athlete_id, D0, today=TODAY)
 
     assert (before.load, before.intensity_factor) == (Decimal("100.0"), Decimal("1.000"))
     assert (after.load, after.intensity_factor) == (Decimal("64.0"), Decimal("0.800"))
+    assert (ride_hr.load, ride_hr.load_method) == (Decimal("100.0"), LoadMethod.HEART_RATE)
     assert (run.load, run.load_method, run.intensity_factor) == (
         Decimal("100.0"),
-        LoadMethod.HEART_RATE,
+        LoadMethod.PACE,
         None,
     )
+    assert (trail.load, trail.load_method) == (Decimal("100.0"), LoadMethod.HEART_RATE)
+    assert (trail_no_hr.load, trail_no_hr.load_method) == (None, None)
     assert (no_moving.load, no_moving.load_method) == (None, None)
 
 
@@ -242,7 +261,13 @@ def test_modified_or_deleted_activity_regenerates_the_series(
 
     changed.normalized_power_w = 250
     session.flush()
+    # Protección de #22: el gancho automático no cambia una carga existente…
     fitness.recompute_since_activity(session, athlete_id, changed.start_at, today=TODAY)
+    assert changed.load == Decimal("64.0")
+    # …el recálculo explícito sí.
+    fitness.recompute_from(
+        session, athlete_id, changed.start_at.date(), today=TODAY, overwrite_existing=True
+    )
     assert changed.load == Decimal("100.0")
     assert _series(session, athlete_id)[3][1] == Decimal("100.0")
     assert _series(session, athlete_id) == _full_recompute(session, athlete_id)
@@ -273,11 +298,119 @@ def test_threshold_change_recomputes_from_its_date(session: Session, athlete_id:
 
     session.add(_threshold(athlete_id, D0 + timedelta(days=5), ftp_w=200))
     session.flush()
-    fitness.recompute_from(session, athlete_id, D0 + timedelta(days=5), today=TODAY)
+    fitness.recompute_from(
+        session, athlete_id, D0 + timedelta(days=5), today=TODAY, overwrite_existing=True
+    )
 
     assert (early.load, late.load) == (Decimal("64.0"), Decimal("100.0"))
     assert _series(session, athlete_id)[7][1] == Decimal("100.0")  # Empieza en D0+1.
     assert _series(session, athlete_id) == _full_recompute(session, athlete_id)
+
+
+# --- Protección de las cargas existentes y simulación (#22) -----------------------------------
+
+
+def test_automatic_recompute_never_changes_or_clears_existing_loads(
+    session: Session, athlete_id: uuid.UUID
+) -> None:
+    session.add(_threshold(athlete_id, D0, ftp_w=250))
+    kept = _ride(athlete_id, D0, load=Decimal("80.0"), load_method=LoadMethod.HEART_RATE)
+    # Con las reglas nuevas, un trail sin LTHR de carrera no tendría carga: se conserva.
+    trail = _ride(
+        athlete_id,
+        D0 + timedelta(days=1),
+        sport=Sport.TRAIL_RUNNING,
+        load=Decimal("55.5"),
+        load_method=LoadMethod.PACE,
+    )
+    rpe = _ride(
+        athlete_id,
+        D0 + timedelta(days=2),
+        sport=Sport.TRAIL_RUNNING,
+        avg_hr=None,
+        load=Decimal("70.0"),
+        load_method=LoadMethod.RPE,
+    )
+    new = _ride(athlete_id, D0 + timedelta(days=3))
+    session.add_all([kept, trail, rpe, new])
+    session.flush()
+
+    fitness.recompute_from(session, athlete_id, D0, today=TODAY)
+
+    assert (kept.load, kept.load_method) == (Decimal("80.0"), LoadMethod.HEART_RATE)
+    assert (trail.load, trail.load_method) == (Decimal("55.5"), LoadMethod.PACE)
+    assert (rpe.load, rpe.load_method) == (Decimal("70.0"), LoadMethod.RPE)
+    # Las nuevas sí se calculan, y la serie usa las cargas conservadas.
+    assert (new.load, new.load_method) == (Decimal("64.0"), LoadMethod.POWER)
+    assert [row[1] for row in _series(session, athlete_id)[:4]] == [
+        Decimal(v) for v in ("80.0", "55.5", "70.0", "64.0")
+    ]
+
+    # Un umbral nuevo (gancho automático) tampoco las toca.
+    session.add(_threshold(athlete_id, D0 + timedelta(days=1), ftp_w=200, running_lthr_bpm=170))
+    session.flush()
+    fitness.recompute_from(session, athlete_id, D0 + timedelta(days=1), today=TODAY)
+    assert (trail.load, new.load) == (Decimal("55.5"), Decimal("64.0"))
+
+
+def test_simulation_reports_changes_without_writing(
+    session: Session, athlete_id: uuid.UUID
+) -> None:
+    session.add(_threshold(athlete_id, D0, ftp_w=250, running_lthr_bpm=170))
+    same = _ride(athlete_id, D0, load=Decimal("64.0"), load_method=LoadMethod.POWER)
+    changed = _ride(athlete_id, D0 + timedelta(days=1), load=Decimal("90.0"))
+    changed.load_method = LoadMethod.POWER
+    method = _ride(
+        athlete_id,
+        D0 + timedelta(days=2),
+        sport=Sport.TRAIL_RUNNING,
+        avg_hr=170,
+        load=Decimal("100.0"),
+        load_method=LoadMethod.PACE,
+    )
+    cleared = _ride(
+        athlete_id,
+        D0 + timedelta(days=3),
+        sport=Sport.RUNNING,
+        load=Decimal("40.0"),
+        load_method=LoadMethod.HEART_RATE,
+    )
+    rpe = _ride(
+        athlete_id, D0 + timedelta(days=4), load=Decimal("10.0"), load_method=LoadMethod.RPE
+    )
+    session.add_all([same, changed, method, cleared, rpe])
+    session.commit()
+
+    changes = fitness.simulate_recompute(session, athlete_id)
+
+    summary = [(c.activity_id, c.old_load, c.new_load, c.new_method, c.delta) for c in changes]
+    assert summary == [
+        (changed.id, Decimal("90.0"), Decimal("64.0"), LoadMethod.POWER, Decimal("-26.0")),
+        (method.id, Decimal("100.0"), Decimal("100.0"), LoadMethod.HEART_RATE, Decimal("0.0")),
+        (cleared.id, Decimal("40.0"), None, None, None),
+    ]
+    assert changes[1].old_method is LoadMethod.PACE
+    # Desde una fecha, sólo las posteriores.
+    later = fitness.simulate_recompute(session, athlete_id, D0 + timedelta(days=2))
+    assert [c.activity_id for c in later] == [method.id, cleared.id]
+    # Nada se ha escrito.
+    assert not session.dirty and not session.new
+    session.rollback()
+    assert _loads(session, athlete_id) == [
+        (D0 + timedelta(days=i), Decimal(v))
+        for i, v in enumerate(("64.0", "90.0", "100.0", "40.0", "10.0"))
+    ]
+    assert _series(session, athlete_id) == []
+
+    # Lo que la simulación anuncia es lo que hace el recálculo explícito.
+    fitness.recompute_from(session, athlete_id, date.min, today=TODAY, overwrite_existing=True)
+    assert fitness.simulate_recompute(session, athlete_id) == []
+    assert (changed.load, method.load_method, cleared.load, rpe.load) == (
+        Decimal("64.0"),
+        LoadMethod.HEART_RATE,
+        None,
+        Decimal("10.0"),
+    )
 
 
 # --- Lectura de la serie -----------------------------------------------------------------------
