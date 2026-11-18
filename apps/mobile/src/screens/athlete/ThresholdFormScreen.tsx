@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { athleteApi } from '../../api/athleteApi';
@@ -10,6 +10,7 @@ import { Button, Section, Chips, Field, Screen, styles } from '../../ui/componen
 import { formatPace, isValidIsoDate, parsePace, todayIsoDate } from '../../ui/dates';
 import { numberToText, parseOptionalNumber, unassignedLegacyLthr } from '../../ui/forms';
 import { options, THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
+import { colors, lines, spacing } from '../../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ThresholdForm'>;
 
@@ -88,35 +89,78 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
     }
   };
 
+  const legacy = current ? unassignedLegacyLthr(current) : null;
+  const field = (key: NumericKey) => {
+    const f = NUMERIC_FIELDS.find((x) => x.key === key);
+    if (!f) return null;
+    return (
+      <Field
+        label={f.label}
+        value={values[f.key]}
+        onChangeText={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
+        keyboardType={f.integer ? 'number-pad' : 'decimal-pad'}
+      />
+    );
+  };
+
   return (
     <Screen error={error} onDismissError={() => setError(null)} title="Nuevo umbral" onBack={navigation.goBack}>
       <Section>
         <Text style={styles.muted}>
           {current
             ? 'Precargado con el umbral vigente. Cambia lo que haya variado: los valores que dejes vacíos quedarán sin registrar desde esa fecha.'
-            : 'Registra tus umbrales. Las zonas se calculan a partir del FTP y de la FC umbral.'}
+            : 'Registra tus umbrales. La API calcula las zonas a partir del FTP, del ritmo umbral y de la FC umbral.'}
         </Text>
         <Field label="Vigente desde" value={effectiveFrom} onChangeText={setEffectiveFrom} placeholder="AAAA-MM-DD" />
-        {current && unassignedLegacyLthr(current) != null ? (
-          <Text style={styles.muted}>
-            FC umbral antigua, sin asignar a ninguna disciplina: {unassignedLegacyLthr(current)} ppm. Es sólo informativa
-            y no se puede editar.
-          </Text>
-        ) : null}
-        {NUMERIC_FIELDS.map((f) => (
-          <Field
-            key={f.key}
-            label={f.label}
-            value={values[f.key]}
-            onChangeText={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
-            keyboardType={f.integer ? 'number-pad' : 'decimal-pad'}
-          />
-        ))}
-        <Field label="Ritmo umbral (min/km)" value={pace} onChangeText={setPace} placeholder="4:45" />
         <Chips label="Origen" options={options(THRESHOLD_SOURCE_LABELS)} value={source} onChange={setSource} />
-        <Field label="Notas" value={notes} onChangeText={setNotes} multiline placeholder="Test de 20 min en rodillo…" />
-        <Button title="Guardar umbral" onPress={save} loading={saving} />
       </Section>
+
+      <Section title="Ciclismo">
+        <View style={local.pair}>
+          <View style={local.half}>{field('ftp_w')}</View>
+          <View style={local.half}>{field('cycling_lthr_bpm')}</View>
+        </View>
+      </Section>
+
+      <Section title="Carrera y trail">
+        <View style={local.pair}>
+          <View style={local.half}>
+            <Field label="Ritmo umbral (min/km)" value={pace} onChangeText={setPace} placeholder="4:45" />
+          </View>
+          <View style={local.half}>{field('running_lthr_bpm')}</View>
+        </View>
+        <Text style={styles.muted}>El ritmo umbral da las zonas de carrera; la FC umbral, las de trail.</Text>
+        {legacy != null ? (
+          <View style={local.legacy}>
+            <Text style={styles.muted}>FC umbral antigua, sin asignar a ninguna disciplina</Text>
+            <Text style={styles.textStrong}>{legacy} ppm</Text>
+            <Text style={styles.muted}>Es sólo informativa y no se puede editar.</Text>
+          </View>
+        ) : null}
+      </Section>
+
+      <Section title="Otros datos">
+        <View style={local.pair}>
+          <View style={local.half}>{field('hr_max_bpm')}</View>
+          <View style={local.half}>{field('hr_rest_bpm')}</View>
+        </View>
+        <View style={local.pair}>
+          <View style={local.half}>{field('vo2max')}</View>
+          <View style={local.half}>{field('weight_kg')}</View>
+        </View>
+        <Field label="Notas" value={notes} onChangeText={setNotes} multiline placeholder="Test de 20 min en rodillo…" />
+      </Section>
+
+      <View style={local.actions}>
+        <Button title="Guardar umbral" onPress={save} loading={saving} />
+      </View>
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  pair: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' },
+  half: { flex: 1 },
+  legacy: { gap: spacing.xxs, paddingTop: spacing.sm, borderTopWidth: lines.hairline, borderTopColor: colors.separator },
+  actions: { paddingTop: spacing.sm, borderTopWidth: lines.hairline, borderTopColor: colors.separator },
+});

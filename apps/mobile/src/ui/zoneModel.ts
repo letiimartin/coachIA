@@ -9,7 +9,7 @@
  *
  * `hr_cycling` y `hr_running` no se muestran en la app.
  */
-import type { Sport, ZoneOut, ZonesOut } from '../api/types';
+import type { Sport, ThresholdOut, ZoneOut, ZonesOut } from '../api/types';
 import { formatPace } from './dates';
 import { zoneColors, type ZoneCode } from './theme';
 
@@ -26,6 +26,19 @@ export type ZoneModel = {
   unit: string;
   /** Umbral de referencia (para textos como «230 W FTP»). */
   thresholdLabel: string;
+  /** Nombre de la disciplina (pestañas de Umbrales y zonas). */
+  sportLabel: string;
+  /** Umbral del que salen las zonas y modelo de la API, para el texto bajo la regla. */
+  basis: string;
+  /** Lee del umbral el valor de referencia (sin calcular nada), o null si falta. */
+  threshold: (t: ThresholdOut) => number | null;
+  /**
+   * true si un valor mayor es más suave (ritmo: más s/km es más lento). La regla y la tabla van
+   * siempre de Z1 a la zona más intensa.
+   */
+  inverted: boolean;
+  /** true si el 0 es un extremo con sentido en la regla (potencia: 0 W). */
+  zeroBased: boolean;
   /** Zonas que devuelve la API para esta disciplina, o null si faltan el umbral o el modelo. */
   zones: (zones: ZonesOut | null | undefined) => ZoneOut[] | null;
   /** Formatea un valor de la API en la unidad de la disciplina (sin la unidad). */
@@ -44,17 +57,48 @@ function read(key: ZoneModelKey) {
 const integer = (value: number) => String(Math.round(value));
 
 const MODELS: Record<ZoneModelKey, ZoneModel> = {
-  power: { key: 'power', metric: 'power', label: 'Potencia', unit: 'W', thresholdLabel: 'FTP', zones: read('power'), format: integer },
+  power: {
+    key: 'power',
+    metric: 'power',
+    label: 'Potencia',
+    unit: 'W',
+    thresholdLabel: 'FTP',
+    sportLabel: 'Ciclismo',
+    basis: 'Calculadas por la API a partir del FTP (7 zonas de Coggan).',
+    threshold: (t) => t.ftp_w,
+    inverted: false,
+    zeroBased: true,
+    zones: read('power'),
+    format: integer,
+  },
   running_pace: {
     key: 'running_pace',
     metric: 'pace',
     label: 'Ritmo',
     unit: '/km',
     thresholdLabel: 'ritmo umbral',
+    sportLabel: 'Carrera',
+    basis: 'Calculadas por la API a partir del ritmo umbral (5 zonas de Friel).',
+    threshold: (t) => t.threshold_pace_s_per_km,
+    inverted: true,
+    zeroBased: false,
     zones: read('running_pace'),
     format: (value) => formatPace(value),
   },
-  trail_hr: { key: 'trail_hr', metric: 'hr', label: 'FC', unit: 'ppm', thresholdLabel: 'FC umbral', zones: read('trail_hr'), format: integer },
+  trail_hr: {
+    key: 'trail_hr',
+    metric: 'hr',
+    label: 'FC',
+    unit: 'ppm',
+    thresholdLabel: 'FC umbral',
+    sportLabel: 'Trail',
+    basis: 'Calculadas por la API a partir de la FC umbral de carrera y trail (5 zonas de Friel).',
+    threshold: (t) => t.running_lthr_bpm,
+    inverted: false,
+    zeroBased: false,
+    zones: read('trail_hr'),
+    format: integer,
+  },
 };
 
 /** Disciplinas con modelo de zonas propio. El resto de deportes no tiene zonas en la app. */
