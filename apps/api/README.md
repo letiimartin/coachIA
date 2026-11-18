@@ -50,7 +50,8 @@ se cambia con `TEST_DB_PORT`. Para empezar de cero, páralo y borra ese director
 | `GET /v1/integrations/wahoo/authorize-url?platform=mobile\|web` | JWT de Supabase | URL para autorizar en Wahoo, con `state` firmado |
 | `DELETE /v1/integrations/wahoo` | JWT de Supabase | Desconecta Wahoo y borra los tokens |
 | `GET /auth/wahoo/callback` | `state` firmado | Redirect URI de Wahoo: canjea el código y vuelve a la app con `?provider=wahoo&status=connected\|error` |
-| `GET /internal/ping` | `X-Internal-API-Key` | Comprobación para n8n |
+| `GET /internal/ping` | `X-Internal-API-Key` | Comprobación para n8n (workflows en [`automation/n8n`](../../automation/n8n/README.md)) |
+| `POST /internal/sync/wahoo` | `X-Internal-API-Key` | Sincroniza todas las integraciones de Wahoo activas (n8n, cada 3 h). Idempotente; con el límite de Wahoo responde `rate_limited: true` y el resto sigue en la próxima ejecución |
 | `GET/POST /webhooks/strava` | token de verificación | Suscripción y eventos de Strava |
 
 Todos los errores tienen el formato `{"error": {"code", "message", "details?"}, "request_id"}`. Todas las respuestas llevan la cabecera `X-Request-ID`.

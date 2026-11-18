@@ -1,0 +1,350 @@
+{
+  "id": "coachiasyncwahoo",
+  "name": "CoachIA · Sync de Wahoo (cada 3 h)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d01",
+      "name": "Cada 3 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */3 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d02",
+      "name": "Ejecutar a mano",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d03",
+      "name": "POST /internal/sync/wahoo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/internal/sync/wahoo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coachiainternal1",
+          "name": "CoachIA API interna"
+        }
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d04",
+      "name": "Clasificar resultado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-1",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "rightValue": 200,
+                    "operator": {
+                      "type": "number",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "error_api"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-2",
+                    "leftValue": "={{ $json.body.failed - ($json.body.rate_limited ? 1 : 0) }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fallos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-3",
+                    "leftValue": "={{ $json.body.rate_limited }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "rate_limited"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "ok"
+        }
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d05",
+      "name": "Error: API no disponible",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "errorMessage": "=Sync de Wahoo: no se pudo llamar a la API ({{ $json.error?.message ?? $json.error ?? 'error de red' }})."
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d06",
+      "name": "Error: respuesta de la API",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        760,
+        -200
+      ],
+      "parameters": {
+        "errorMessage": "=Sync de Wahoo: la API respondió {{ $json.statusCode }} ({{ $json.body?.error?.code ?? 'sin código' }}: {{ $json.body?.error?.message ?? '' }}). request_id: {{ $json.body?.request_id ?? $json.headers?.['x-request-id'] ?? '-' }}"
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d07",
+      "name": "Error: fallos de usuarios",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        760,
+        -40
+      ],
+      "parameters": {
+        "errorMessage": "=Sync de Wahoo: {{ $json.body.failed }} de {{ $json.body.integrations }} integraciones fallaron (rate_limited: {{ $json.body.rate_limited }}). Detalle en los logs de la API."
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d08",
+      "name": "Límite de Wahoo: sigue en la próxima ejecución",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        120
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "status",
+              "type": "string",
+              "value": "rate_limited"
+            },
+            {
+              "id": "r2",
+              "name": "message",
+              "type": "string",
+              "value": "=Wahoo aplicó el límite de peticiones tras {{ $json.body.succeeded }} de {{ $json.body.integrations }} integraciones. El resto se sincroniza en la próxima ejecución."
+            },
+            {
+              "id": "r3",
+              "name": "result",
+              "type": "object",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5e1b7c3a-8d2f-4a6b-9c1e-7f2a3b4c5d09",
+      "name": "Sync correcto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        280
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "o1",
+              "name": "status",
+              "type": "string",
+              "value": "ok"
+            },
+            {
+              "id": "o2",
+              "name": "result",
+              "type": "object",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Cada 3 horas": {
+      "main": [
+        [
+          {
+            "node": "POST /internal/sync/wahoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar a mano": {
+      "main": [
+        [
+          {
+            "node": "POST /internal/sync/wahoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /internal/sync/wahoo": {
+      "main": [
+        [
+          {
+            "node": "Clasificar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: API no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar resultado": {
+      "main": [
+        [
+          {
+            "node": "Error: respuesta de la API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: fallos de usuarios",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Límite de Wahoo: sigue en la próxima ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sync correcto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 600
+  },
+  "pinData": {},
+  "tags": []
+}
