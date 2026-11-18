@@ -395,7 +395,7 @@ class _Plan:
 def _plan(
     session: Session, user_id: uuid.UUID, proposal: ThresholdProposal, *, lock: bool = False
 ) -> _Plan:
-    """Calcula la vista previa. Con `lock`, bloquea la fila vigente en `test_date` hasta el commit."""
+    """Calcula la vista previa. Con `lock`, bloquea hasta el commit la fila vigente ese día."""
     test_date = proposal.test_date
     base_query = (
         sa.select(AthleteThreshold)
