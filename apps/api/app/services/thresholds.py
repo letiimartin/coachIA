@@ -93,8 +93,12 @@ def zones_for(threshold: AthleteThreshold) -> ZonesOut:
         zones = model.zones(None if value is None else float(value))
         return None if zones is None else _zones_out(zones)
 
-    cycling_lthr = getattr(threshold, lthr_field_for(Sport.CYCLING))
-    running_lthr = getattr(threshold, lthr_field_for(Sport.RUNNING))
+    def lthr(sport: Sport) -> int | None:
+        field = lthr_field_for(sport)
+        return None if field is None else getattr(threshold, field)
+
+    cycling_lthr = lthr(Sport.CYCLING)
+    running_lthr = lthr(Sport.RUNNING)
     return ZonesOut(
         power=model_zones(Sport.CYCLING),
         running_pace=model_zones(Sport.RUNNING),

@@ -9,6 +9,7 @@ import type { CurrentThresholdOut, ThresholdOut, ZoneOut } from '../../api/types
 import type { RootStackParamList } from '../../navigation/types';
 import { Button, Card, InfoRow, Loading, Screen, styles } from '../../ui/components';
 import { formatDate, formatPace } from '../../ui/dates';
+import { unassignedLegacyLthr } from '../../ui/forms';
 import { THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
 import { colors } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
@@ -32,7 +33,7 @@ function ThresholdValues({ t }: { t: ThresholdOut }) {
     ['FTP', t.ftp_w != null ? `${t.ftp_w} W` : null],
     ['FC umbral en ciclismo', t.cycling_lthr_bpm != null ? `${t.cycling_lthr_bpm} ppm` : null],
     ['FC umbral en carrera y trail', t.running_lthr_bpm != null ? `${t.running_lthr_bpm} ppm` : null],
-    ['FC umbral antigua (sin asignar)', t.legacy_lthr_bpm != null ? `${t.legacy_lthr_bpm} ppm` : null],
+    ['FC umbral antigua (sin asignar)', unassignedLegacyLthr(t) != null ? `${unassignedLegacyLthr(t)} ppm` : null],
     ['FC máxima', t.hr_max_bpm != null ? `${t.hr_max_bpm} ppm` : null],
     ['FC en reposo', t.hr_rest_bpm != null ? `${t.hr_rest_bpm} ppm` : null],
     ['Ritmo umbral', t.threshold_pace_s_per_km != null ? `${formatPace(t.threshold_pace_s_per_km)} /km` : null],

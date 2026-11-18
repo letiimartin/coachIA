@@ -25,6 +25,7 @@ cálculo en ``intensity_factor_for``) sin tocar el resto.
 
 El método se elige por deporte con una sola tabla, ``LOAD_RULES``: cada deporte tiene sus
 métodos en orden de preferencia y dice si su carga suma en la carga diaria (CTL/ATL/TSB).
+Un deporte sin métodos sólo se registra: no se le calcula carga ni suma en la curva.
 
 - Ciclismo: potencia → FC sobre el LTHR de ciclismo → RPE.
 - Carrera: ritmo → FC sobre el LTHR de carrera (p. ej. en cinta sin sensor) → RPE.
@@ -32,8 +33,11 @@ métodos en orden de preferencia y dice si su carga suma en la carga diaria (CTL
   lo invalida.
 - Fuerza (``strength``): sólo ``session_rpe`` = minutos × RPE de la sesión (Foster), nunca
   potencia, ritmo ni FC. No es TSS y no suma en la carga diaria.
-- Senderismo, natación y otros: FC, como antes. Qué LTHR usa cada deporte lo decide
-  ``app.metrics.zones.lthr_field_for``.
+- Senderismo, natación y otros: sólo se registran. No se calcula su carga (ni con la FC
+  umbral de carrera) ni suman en CTL/ATL. Las cargas que ya tengan guardadas se conservan como
+  dato histórico (ver ``app.services.fitness``).
+
+Qué LTHR usa cada deporte lo decide ``app.metrics.zones.lthr_field_for``.
 
 El paso RPE de resistencia (estimación de TSS a partir del RPE) no tiene todavía una fórmula
 aprobada: devuelve ``None``. Las cargas por RPE ya guardadas (manuales) las conserva quien
@@ -194,11 +198,15 @@ class SportLoadRule:
     methods: tuple[LoadMethod, ...]
     endurance: bool
 
+    @property
+    def registered_only(self) -> bool:
+        """Sin métodos: la actividad se registra, pero no se le calcula carga."""
+        return not self.methods
 
-_ENDURANCE_HR = SportLoadRule((LoadMethod.HEART_RATE,), endurance=True)
+
+_REGISTERED_ONLY = SportLoadRule((), endurance=False)
 
 # Única correspondencia deporte → métodos. Una disciplina nueva sólo añade una entrada.
-# Senderismo, natación y otros siguen como antes (FC y suman); pendiente de decisión (#22).
 LOAD_RULES: Mapping[Sport, SportLoadRule] = {
     Sport.CYCLING: SportLoadRule(
         (LoadMethod.POWER, LoadMethod.HEART_RATE, LoadMethod.RPE), endurance=True
@@ -208,9 +216,9 @@ LOAD_RULES: Mapping[Sport, SportLoadRule] = {
     ),
     Sport.TRAIL_RUNNING: SportLoadRule((LoadMethod.HEART_RATE, LoadMethod.RPE), endurance=True),
     Sport.STRENGTH: SportLoadRule((LoadMethod.SESSION_RPE,), endurance=False),
-    Sport.HIKING: _ENDURANCE_HR,
-    Sport.SWIMMING: _ENDURANCE_HR,
-    Sport.OTHER: _ENDURANCE_HR,
+    Sport.HIKING: _REGISTERED_ONLY,
+    Sport.SWIMMING: _REGISTERED_ONLY,
+    Sport.OTHER: _REGISTERED_ONLY,
 }
 
 

@@ -172,11 +172,15 @@ def test_lthr_per_discipline_and_threshold_fields_exist() -> None:
     # El trail usa el LTHR de carrera, y es el mismo que alimenta sus zonas.
     trail = zone_model_for(Sport.TRAIL_RUNNING)
     assert trail is not None and lthr_field_for(Sport.TRAIL_RUNNING) == trail.threshold_field
-    columns = set(AthleteThreshold.__table__.columns.keys())
+    # Fuerza, senderismo, natación y otros no usan ningún LTHR.
+    for sport in (Sport.STRENGTH, Sport.HIKING, Sport.SWIMMING, Sport.OTHER):
+        assert lthr_field_for(sport) is None
+    attributes = set(AthleteThreshold.__mapper__.attrs.keys())
     for sport in Sport:
-        assert lthr_field_for(sport) in columns
+        field = lthr_field_for(sport)
+        assert field is None or field in attributes
         model = zone_model_for(sport)
-        assert model is None or model.threshold_field in columns
+        assert model is None or model.threshold_field in attributes
 
 
 @pytest.mark.parametrize("bad", [-1, math.nan])

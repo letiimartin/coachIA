@@ -8,7 +8,7 @@ import type { ThresholdCreate, ThresholdSource } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
 import { Button, Card, Chips, Field, Screen, styles } from '../../ui/components';
 import { formatPace, isValidIsoDate, parsePace, todayIsoDate } from '../../ui/dates';
-import { numberToText, parseOptionalNumber } from '../../ui/forms';
+import { numberToText, parseOptionalNumber, unassignedLegacyLthr } from '../../ui/forms';
 import { options, THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ThresholdForm'>;
@@ -97,9 +97,10 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
             : 'Registra tus umbrales. Las zonas se calculan a partir del FTP y de la FC umbral.'}
         </Text>
         <Field label="Vigente desde" value={effectiveFrom} onChangeText={setEffectiveFrom} placeholder="AAAA-MM-DD" />
-        {current?.legacy_lthr_bpm != null ? (
+        {current && unassignedLegacyLthr(current) != null ? (
           <Text style={styles.muted}>
-            FC umbral antigua, sin asignar a ninguna disciplina: {current.legacy_lthr_bpm} ppm. Es sólo informativa y no se puede editar.
+            FC umbral antigua, sin asignar a ninguna disciplina: {unassignedLegacyLthr(current)} ppm. Es sólo informativa
+            y no se puede editar.
           </Text>
         ) : null}
         {NUMERIC_FIELDS.map((f) => (

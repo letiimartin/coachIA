@@ -1,4 +1,7 @@
-"""Migración de #22 (LTHR por disciplina, `rpe` y `session_rpe`) y asignación del LTHR antiguo."""
+"""Migración compatible de #22 (LTHR por disciplina, `rpe`, `session_rpe`) y LTHR antiguo.
+
+La migración no renombra `lthr_bpm`: el código lo lee como `legacy_lthr_bpm`.
+"""
 
 import uuid
 from collections.abc import Iterator
@@ -7,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from alembic.config import Config
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -83,7 +86,7 @@ def _rows(engine: Engine, user: uuid.UUID) -> list[tuple[object, ...]]:
             tuple(row)
             for row in conn.execute(
                 text(
-                    "SELECT effective_from::text, legacy_lthr_bpm, cycling_lthr_bpm,"
+                    "SELECT effective_from::text, lthr_bpm, cycling_lthr_bpm,"
                     " running_lthr_bpm FROM athlete_thresholds WHERE user_id = :u"
                     " ORDER BY effective_from"
                 ),
@@ -95,8 +98,9 @@ def _rows(engine: Engine, user: uuid.UUID) -> list[tuple[object, ...]]:
 def test_migration_keeps_old_values_without_assigning_them(
     engine: Engine, migrated_user: uuid.UUID
 ) -> None:
-    assert {"legacy_lthr_bpm", "cycling_lthr_bpm", "running_lthr_bpm"} <= _columns(engine)
-    assert "lthr_bpm" not in _columns(engine)
+    # Compatible: lthr_bpm sigue ahí con su nombre (el código desplegado lo usa).
+    assert {"lthr_bpm", "cycling_lthr_bpm", "running_lthr_bpm"} <= _columns(engine)
+    assert "legacy_lthr_bpm" not in _columns(engine)
     assert _rows(engine, migrated_user) == [
         ("2026-01-01", 168, None, None),
         ("2026-06-01", 177, None, None),
@@ -104,7 +108,7 @@ def test_migration_keeps_old_values_without_assigning_them(
     ]
 
 
-def test_migration_downgrade_restores_lthr_bpm(
+def test_migration_downgrade_keeps_lthr_bpm(
     engine: Engine, alembic_config: Config, migrated_user: uuid.UUID
 ) -> None:
     command.downgrade(alembic_config, BEFORE)
@@ -132,7 +136,38 @@ def test_migration_downgrade_restores_lthr_bpm(
     assert _rows(engine, migrated_user)[0] == ("2026-01-01", 168, None, None)
 
 
-@pytest.mark.parametrize("column", ["cycling_lthr_bpm", "running_lthr_bpm", "legacy_lthr_bpm"])
+def test_migration_is_compatible_with_code_that_still_uses_lthr_bpm(
+    engine: Engine, migrated_user: uuid.UUID
+) -> None:
+    # El código desplegado antes de #22 escribe y lee `lthr_bpm`: sigue funcionando.
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO athlete_thresholds (user_id, effective_from, lthr_bpm)"
+                " VALUES (:u, '2026-10-01', 171)"
+            ),
+            {"u": migrated_user},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO activities (user_id, source, external_id, sport, start_at, load,"
+                " load_method) VALUES (:u, 'wahoo', 'old', 'cycling', '2026-10-02T08:00Z', 50,"
+                " 'heart_rate')"
+            ),
+            {"u": migrated_user},
+        )
+    # Y el código nuevo lo lee como `legacy_lthr_bpm`.
+    with Session(engine) as session:
+        row = session.scalars(
+            select(AthleteThreshold).where(
+                AthleteThreshold.user_id == migrated_user,
+                AthleteThreshold.legacy_lthr_bpm == 171,
+            )
+        ).one()
+        assert (row.cycling_lthr_bpm, row.running_lthr_bpm) == (None, None)
+
+
+@pytest.mark.parametrize("column", ["cycling_lthr_bpm", "running_lthr_bpm", "lthr_bpm"])
 @pytest.mark.parametrize("value", [79, 231])
 def test_lthr_columns_have_the_same_check(
     session: Session, athlete_id: uuid.UUID, column: str, value: int

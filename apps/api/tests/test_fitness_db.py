@@ -500,6 +500,89 @@ def test_activity_rpe_check(session: Session, athlete_id: uuid.UUID) -> None:
             session.flush()
 
 
+# --- Senderismo, natación y otros: sólo se registran (#22) ------------------------------------
+
+
+def test_registered_only_sports_get_no_load_and_keep_their_history(
+    session: Session, athlete_id: uuid.UUID
+) -> None:
+    session.add(_threshold(athlete_id, D0, ftp_w=250, cycling_lthr_bpm=150, running_lthr_bpm=150))
+    ride = _ride(athlete_id, D0)
+    # Históricas: carga por FC calculada con el LTHR único de antes.
+    old_hike = _ride(
+        athlete_id,
+        D0 + timedelta(days=1),
+        sport=Sport.HIKING,
+        np_w=0,
+        load=Decimal("90.0"),
+        load_method=LoadMethod.HEART_RATE,
+    )
+    old_swim = _ride(
+        athlete_id,
+        D0 + timedelta(days=2),
+        sport=Sport.SWIMMING,
+        np_w=0,
+        load=Decimal("40.0"),
+        load_method=LoadMethod.HEART_RATE,
+    )
+    # Nueva, con FC y LTHR de carrera: no se le calcula carga.
+    new_hike = _ride(athlete_id, D0 + timedelta(days=3), sport=Sport.HIKING, np_w=0, avg_hr=150)
+    session.add_all([ride, old_hike, old_swim, new_hike])
+    session.commit()
+
+    # Automático (con protección): la curva no cambia; las históricas siguen sumando.
+    fitness.recompute_from(session, athlete_id, D0, today=TODAY)
+    assert (new_hike.load, new_hike.load_method) == (None, None)
+    assert [row[1] for row in _series(session, athlete_id)[:4]] == [
+        Decimal(v) for v in ("64.0", "90.0", "40.0", "0.0")
+    ]
+    protected_curve = _series(session, athlete_id)
+    session.commit()
+
+    # La simulación enseña cuánto cambia la curva al excluirlas, sin escribir nada.
+    simulation = fitness.simulate_curve(session, athlete_id, today=TODAY)
+    assert not session.dirty and not session.new
+    assert [(e.sport, e.activities, e.load) for e in simulation.excluded] == [
+        (Sport.HIKING, 1, 90.0),
+        (Sport.SWIMMING, 1, 40.0),
+    ]
+    with_them = fitness_series(
+        {D0: 64.0, D0 + timedelta(days=1): 90.0, D0 + timedelta(days=2): 40.0}, start=D0, end=TODAY
+    )
+    without_them = fitness_series({D0: 64.0}, start=D0, end=TODAY)
+    assert [d.ctl for d in simulation.current] == pytest.approx([d.ctl for d in with_them])
+    assert [d.ctl for d in simulation.without_registered] == pytest.approx(
+        [d.ctl for d in without_them]
+    )
+    assert simulation.exclusion_deltas[-1].ctl == pytest.approx(
+        without_them[-1].ctl - with_them[-1].ctl
+    )
+    assert simulation.exclusion_deltas[0].ctl == 0
+    assert [d.ctl for d in simulation.after_recompute] == pytest.approx(
+        [d.ctl for d in without_them]
+    )
+    # La curva simulada «actual» es la guardada.
+    assert [float(row[2]) for row in protected_curve] == pytest.approx(
+        [d.ctl for d in simulation.current], abs=1e-3
+    )
+    assert _series(session, athlete_id) == protected_curve
+
+    # Recálculo explícito: las excluye de la curva, pero conserva su carga histórica.
+    fitness.recompute_from(session, athlete_id, date.min, today=TODAY, overwrite_existing=True)
+    assert (old_hike.load, old_hike.load_method) == (Decimal("90.0"), LoadMethod.HEART_RATE)
+    assert (old_swim.load, old_swim.load_method) == (Decimal("40.0"), LoadMethod.HEART_RATE)
+    assert new_hike.load is None
+    assert [row[1] for row in _series(session, athlete_id)[:4]] == [
+        Decimal(v) for v in ("64.0", "0.0", "0.0", "0.0")
+    ]
+    assert fitness.simulate_recompute(session, athlete_id) == []
+
+
+def test_simulate_curve_without_activities(session: Session, athlete_id: uuid.UUID) -> None:
+    simulation = fitness.simulate_curve(session, athlete_id, today=TODAY)
+    assert simulation.current == simulation.exclusion_deltas == simulation.excluded == []
+
+
 # --- Lectura de la serie -----------------------------------------------------------------------
 
 

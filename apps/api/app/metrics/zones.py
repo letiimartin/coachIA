@@ -169,23 +169,18 @@ class ZoneKind(enum.StrEnum):
 
 # Columna de `athlete_thresholds` con el LTHR de cada deporte, para sus zonas de FC y para la
 # carga por FC. Única correspondencia: un `trail_lthr_bpm` futuro sólo cambia la entrada de
-# trail. Senderismo, natación y otros mantienen la carga por FC de antes; como ya no hay LTHR
-# único, usan el de carrera (provisional, ver el PR de #22). La fuerza no usa la FC para la
-# carga (``app.metrics.load.LOAD_RULES``).
+# trail. Los demás deportes no usan ningún LTHR: la fuerza se carga por session RPE, y
+# senderismo, natación y otros sólo se registran (``app.metrics.load.LOAD_RULES``).
 _LTHR_FIELD: Mapping[Sport, str] = {
     Sport.CYCLING: "cycling_lthr_bpm",
     Sport.RUNNING: "running_lthr_bpm",
     Sport.TRAIL_RUNNING: "running_lthr_bpm",
-    Sport.HIKING: "running_lthr_bpm",
-    Sport.STRENGTH: "running_lthr_bpm",
-    Sport.SWIMMING: "running_lthr_bpm",
-    Sport.OTHER: "running_lthr_bpm",
 }
 
 
-def lthr_field_for(sport: Sport) -> str:
-    """Columna de `athlete_thresholds` con el LTHR que usa ``sport``."""
-    return _LTHR_FIELD[sport]
+def lthr_field_for(sport: Sport) -> str | None:
+    """Columna de `athlete_thresholds` con el LTHR que usa ``sport``; ``None`` si no usa."""
+    return _LTHR_FIELD.get(sport)
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,7 +201,7 @@ _ZONE_MODELS: Mapping[Sport, ZoneModel] = {
     Sport.CYCLING: ZoneModel(ZoneKind.POWER, "ftp_w", "W", power_zones),
     Sport.RUNNING: ZoneModel(ZoneKind.PACE, "threshold_pace_s_per_km", "s/km", pace_zones),
     Sport.TRAIL_RUNNING: ZoneModel(
-        ZoneKind.HEART_RATE, lthr_field_for(Sport.TRAIL_RUNNING), "bpm", trail_hr_zones
+        ZoneKind.HEART_RATE, _LTHR_FIELD[Sport.TRAIL_RUNNING], "bpm", trail_hr_zones
     ),
 }
 

@@ -177,10 +177,11 @@ def test_endurance_rpe_step_is_pending_a_formula() -> None:
 
 
 @pytest.mark.parametrize("sport", [Sport.HIKING, Sport.SWIMMING, Sport.OTHER])
-def test_other_sports_keep_hr_load_only(sport: Sport) -> None:
-    result = activity_load(sport, 3600, **EVERYTHING, rpe=7)
-    assert result is not None and result.method is LoadMethod.HEART_RATE
-    assert activity_load(sport, 3600, **{**EVERYTHING, "avg_hr_bpm": None}, rpe=7) is None
+def test_registered_only_sports_never_get_a_load(sport: Sport) -> None:
+    # Ni con FC y LTHR (de carrera o de ciclismo), ni con potencia, ritmo o RPE.
+    assert LOAD_RULES[sport].registered_only
+    assert activity_load(sport, 3600, **EVERYTHING, rpe=7) is None
+    assert not counts_in_daily_load(sport, LoadMethod.HEART_RATE)
 
 
 # --- Fuerza: session RPE --------------------------------------------------------------------
@@ -222,6 +223,9 @@ def test_only_endurance_counts_in_daily_load() -> None:
     # Una carga TSS antigua de fuerza tampoco suma.
     assert not counts_in_daily_load(Sport.STRENGTH, LoadMethod.HEART_RATE)
     assert not counts_in_daily_load(Sport.STRENGTH, LoadMethod.SESSION_RPE)
+    assert not LOAD_RULES[Sport.STRENGTH].registered_only
+    for sport in (Sport.CYCLING, Sport.RUNNING, Sport.TRAIL_RUNNING):
+        assert not LOAD_RULES[sport].registered_only
 
 
 def test_every_sport_has_a_rule() -> None:
