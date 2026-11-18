@@ -13,12 +13,13 @@ import { options, THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ThresholdForm'>;
 
-type NumericKey = 'ftp_w' | 'lthr_bpm' | 'hr_max_bpm' | 'hr_rest_bpm' | 'vo2max' | 'weight_kg';
+type NumericKey = 'ftp_w' | 'cycling_lthr_bpm' | 'running_lthr_bpm' | 'hr_max_bpm' | 'hr_rest_bpm' | 'vo2max' | 'weight_kg';
 
 /** Límites del contrato (ThresholdCreate). */
 const NUMERIC_FIELDS: { key: NumericKey; label: string; min: number; max: number; integer: boolean; decimals: number }[] = [
   { key: 'ftp_w', label: 'FTP (W)', min: 50, max: 700, integer: true, decimals: 0 },
-  { key: 'lthr_bpm', label: 'FC umbral, LTHR (ppm)', min: 80, max: 230, integer: true, decimals: 0 },
+  { key: 'cycling_lthr_bpm', label: 'FC umbral en ciclismo (ppm)', min: 80, max: 230, integer: true, decimals: 0 },
+  { key: 'running_lthr_bpm', label: 'FC umbral en carrera y trail (ppm)', min: 80, max: 230, integer: true, decimals: 0 },
   { key: 'hr_max_bpm', label: 'FC máxima (ppm)', min: 100, max: 240, integer: true, decimals: 0 },
   { key: 'hr_rest_bpm', label: 'FC en reposo (ppm)', min: 25, max: 120, integer: true, decimals: 0 },
   { key: 'vo2max', label: 'VO2máx (ml/kg/min)', min: 10, max: 100, integer: false, decimals: 1 },
@@ -30,7 +31,8 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
   // Precargado con el umbral vigente: el POST es una foto completa.
   const [values, setValues] = useState<Record<NumericKey, string>>(() => ({
     ftp_w: numberToText(current?.ftp_w),
-    lthr_bpm: numberToText(current?.lthr_bpm),
+    cycling_lthr_bpm: numberToText(current?.cycling_lthr_bpm),
+    running_lthr_bpm: numberToText(current?.running_lthr_bpm),
     hr_max_bpm: numberToText(current?.hr_max_bpm),
     hr_rest_bpm: numberToText(current?.hr_rest_bpm),
     vo2max: numberToText(current?.vo2max),
@@ -95,6 +97,11 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
             : 'Registra tus umbrales. Las zonas se calculan a partir del FTP y de la FC umbral.'}
         </Text>
         <Field label="Vigente desde" value={effectiveFrom} onChangeText={setEffectiveFrom} placeholder="AAAA-MM-DD" />
+        {current?.legacy_lthr_bpm != null ? (
+          <Text style={styles.muted}>
+            FC umbral antigua, sin asignar a ninguna disciplina: {current.legacy_lthr_bpm} ppm. Es sólo informativa y no se puede editar.
+          </Text>
+        ) : null}
         {NUMERIC_FIELDS.map((f) => (
           <Field
             key={f.key}

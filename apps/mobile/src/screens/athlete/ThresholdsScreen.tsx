@@ -30,7 +30,9 @@ async function loadAll(): Promise<{ current: CurrentThresholdOut | null; history
 function ThresholdValues({ t }: { t: ThresholdOut }) {
   const rows: [string, string | null][] = [
     ['FTP', t.ftp_w != null ? `${t.ftp_w} W` : null],
-    ['FC umbral (LTHR)', t.lthr_bpm != null ? `${t.lthr_bpm} ppm` : null],
+    ['FC umbral en ciclismo', t.cycling_lthr_bpm != null ? `${t.cycling_lthr_bpm} ppm` : null],
+    ['FC umbral en carrera y trail', t.running_lthr_bpm != null ? `${t.running_lthr_bpm} ppm` : null],
+    ['FC umbral antigua (sin asignar)', t.legacy_lthr_bpm != null ? `${t.legacy_lthr_bpm} ppm` : null],
     ['FC máxima', t.hr_max_bpm != null ? `${t.hr_max_bpm} ppm` : null],
     ['FC en reposo', t.hr_rest_bpm != null ? `${t.hr_rest_bpm} ppm` : null],
     ['Ritmo umbral', t.threshold_pace_s_per_km != null ? `${formatPace(t.threshold_pace_s_per_km)} /km` : null],

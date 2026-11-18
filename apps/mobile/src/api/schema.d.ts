@@ -569,13 +569,14 @@ export interface components {
          *       "on": "2026-11-17",
          *       "threshold": {
          *         "created_at": "2026-11-01T19:00:00Z",
+         *         "cycling_lthr_bpm": 165,
          *         "effective_from": "2026-11-01",
          *         "ftp_w": 230,
          *         "hr_max_bpm": 186,
          *         "hr_rest_bpm": 48,
          *         "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
-         *         "lthr_bpm": 168,
          *         "notes": "Test de 20 min en rodillo.",
+         *         "running_lthr_bpm": 172,
          *         "source": "test",
          *         "threshold_pace_s_per_km": 285,
          *         "updated_at": "2026-11-01T19:00:00Z",
@@ -586,49 +587,49 @@ export interface components {
          *         "hr_cycling": [
          *           {
          *             "code": "Z1",
-         *             "high": 136.1,
+         *             "high": 133.7,
          *             "low": 0,
          *             "name": "Recuperación",
          *             "number": 1
          *           },
          *           {
          *             "code": "Z2",
-         *             "high": 151.2,
-         *             "low": 136.1,
+         *             "high": 148.5,
+         *             "low": 133.7,
          *             "name": "Resistencia aeróbica",
          *             "number": 2
          *           },
          *           {
          *             "code": "Z3",
-         *             "high": 157.9,
-         *             "low": 151.2,
+         *             "high": 155.1,
+         *             "low": 148.5,
          *             "name": "Tempo",
          *             "number": 3
          *           },
          *           {
          *             "code": "Z4",
-         *             "high": 168,
-         *             "low": 157.9,
+         *             "high": 165,
+         *             "low": 155.1,
          *             "name": "Subumbral",
          *             "number": 4
          *           },
          *           {
          *             "code": "Z5a",
-         *             "high": 173,
-         *             "low": 168,
+         *             "high": 170,
+         *             "low": 165,
          *             "name": "Supraumbral",
          *             "number": 5
          *           },
          *           {
          *             "code": "Z5b",
-         *             "high": 178.1,
-         *             "low": 173,
+         *             "high": 174.9,
+         *             "low": 170,
          *             "name": "Capacidad aeróbica",
          *             "number": 6
          *           },
          *           {
          *             "code": "Z5c",
-         *             "low": 178.1,
+         *             "low": 174.9,
          *             "name": "Potencia anaeróbica",
          *             "number": 7
          *           }
@@ -636,49 +637,49 @@ export interface components {
          *         "hr_running": [
          *           {
          *             "code": "Z1",
-         *             "high": 142.8,
+         *             "high": 146.2,
          *             "low": 0,
          *             "name": "Recuperación",
          *             "number": 1
          *           },
          *           {
          *             "code": "Z2",
-         *             "high": 151.2,
-         *             "low": 142.8,
+         *             "high": 154.8,
+         *             "low": 146.2,
          *             "name": "Resistencia aeróbica",
          *             "number": 2
          *           },
          *           {
          *             "code": "Z3",
-         *             "high": 159.6,
-         *             "low": 151.2,
+         *             "high": 163.4,
+         *             "low": 154.8,
          *             "name": "Tempo",
          *             "number": 3
          *           },
          *           {
          *             "code": "Z4",
-         *             "high": 168,
-         *             "low": 159.6,
+         *             "high": 172,
+         *             "low": 163.4,
          *             "name": "Subumbral",
          *             "number": 4
          *           },
          *           {
          *             "code": "Z5a",
-         *             "high": 173,
-         *             "low": 168,
+         *             "high": 177.2,
+         *             "low": 172,
          *             "name": "Supraumbral",
          *             "number": 5
          *           },
          *           {
          *             "code": "Z5b",
-         *             "high": 178.1,
-         *             "low": 173,
+         *             "high": 182.3,
+         *             "low": 177.2,
          *             "name": "Capacidad aeróbica",
          *             "number": 6
          *           },
          *           {
          *             "code": "Z5c",
-         *             "low": 178.1,
+         *             "low": 182.3,
          *             "name": "Potencia anaeróbica",
          *             "number": 7
          *           }
@@ -731,6 +732,78 @@ export interface components {
          *             "low": 345,
          *             "name": "Neuromuscular",
          *             "number": 7
+         *           }
+         *         ],
+         *         "running_pace": [
+         *           {
+         *             "code": "Z1",
+         *             "low": 367.7,
+         *             "name": "Recuperación",
+         *             "number": 1
+         *           },
+         *           {
+         *             "code": "Z2",
+         *             "high": 367.7,
+         *             "low": 324.9,
+         *             "name": "Aeróbico",
+         *             "number": 2
+         *           },
+         *           {
+         *             "code": "Z3",
+         *             "high": 324.9,
+         *             "low": 302.1,
+         *             "name": "Tempo",
+         *             "number": 3
+         *           },
+         *           {
+         *             "code": "Z4",
+         *             "high": 302.1,
+         *             "low": 285,
+         *             "name": "Umbral",
+         *             "number": 4
+         *           },
+         *           {
+         *             "code": "Z5",
+         *             "high": 285,
+         *             "low": 0,
+         *             "name": "Por encima del umbral",
+         *             "number": 5
+         *           }
+         *         ],
+         *         "trail_hr": [
+         *           {
+         *             "code": "Z1",
+         *             "high": 146.2,
+         *             "low": 0,
+         *             "name": "Recuperación",
+         *             "number": 1
+         *           },
+         *           {
+         *             "code": "Z2",
+         *             "high": 154.8,
+         *             "low": 146.2,
+         *             "name": "Aeróbico",
+         *             "number": 2
+         *           },
+         *           {
+         *             "code": "Z3",
+         *             "high": 163.4,
+         *             "low": 154.8,
+         *             "name": "Tempo",
+         *             "number": 3
+         *           },
+         *           {
+         *             "code": "Z4",
+         *             "high": 172,
+         *             "low": 163.4,
+         *             "name": "Umbral",
+         *             "number": 4
+         *           },
+         *           {
+         *             "code": "Z5",
+         *             "low": 172,
+         *             "name": "Por encima del umbral",
+         *             "number": 5
          *           }
          *         ]
          *       }
@@ -1185,13 +1258,17 @@ export interface components {
          *
          *     Es una foto completa: los valores que no se envían quedan vacíos para esa fecha. La app
          *     debería precargar el formulario con el umbral vigente. Debe incluir al menos un umbral.
+         *
+         *     El LTHR va por disciplina: `cycling_lthr_bpm` (carga por FC de ciclismo) y
+         *     `running_lthr_bpm` (zonas y carga de trail). `legacy_lthr_bpm` es de sólo lectura.
          * @example {
+         *       "cycling_lthr_bpm": 165,
          *       "effective_from": "2026-11-01",
          *       "ftp_w": 230,
          *       "hr_max_bpm": 186,
          *       "hr_rest_bpm": 48,
-         *       "lthr_bpm": 168,
          *       "notes": "Test de 20 min en rodillo.",
+         *       "running_lthr_bpm": 172,
          *       "source": "test",
          *       "threshold_pace_s_per_km": 285,
          *       "vo2max": 52,
@@ -1199,6 +1276,8 @@ export interface components {
          *     }
          */
         ThresholdCreate: {
+            /** Cycling Lthr Bpm */
+            cycling_lthr_bpm?: number | null;
             /**
              * Effective From
              * Format: date
@@ -1210,10 +1289,10 @@ export interface components {
             hr_max_bpm?: number | null;
             /** Hr Rest Bpm */
             hr_rest_bpm?: number | null;
-            /** Lthr Bpm */
-            lthr_bpm?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Running Lthr Bpm */
+            running_lthr_bpm?: number | null;
             /** @default manual */
             source: components["schemas"]["ThresholdSource"];
             /** Threshold Pace S Per Km */
@@ -1227,13 +1306,14 @@ export interface components {
          * ThresholdOut
          * @example {
          *       "created_at": "2026-11-01T19:00:00Z",
+         *       "cycling_lthr_bpm": 165,
          *       "effective_from": "2026-11-01",
          *       "ftp_w": 230,
          *       "hr_max_bpm": 186,
          *       "hr_rest_bpm": 48,
          *       "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
-         *       "lthr_bpm": 168,
          *       "notes": "Test de 20 min en rodillo.",
+         *       "running_lthr_bpm": 172,
          *       "source": "test",
          *       "threshold_pace_s_per_km": 285,
          *       "updated_at": "2026-11-01T19:00:00Z",
@@ -1247,6 +1327,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Cycling Lthr Bpm */
+            cycling_lthr_bpm: number | null;
             /**
              * Effective From
              * Format: date
@@ -1263,10 +1345,15 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Lthr Bpm */
-            lthr_bpm: number | null;
+            /**
+             * Legacy Lthr Bpm
+             * @description LTHR único anterior a la separación por disciplina. Sólo lectura: ningún cálculo lo usa; está para decidir a qué disciplina pertenecía.
+             */
+            readonly legacy_lthr_bpm: number | null;
             /** Notes */
             notes: string | null;
+            /** Running Lthr Bpm */
+            running_lthr_bpm: number | null;
             source: components["schemas"]["ThresholdSource"];
             /** Threshold Pace S Per Km */
             threshold_pace_s_per_km: number | null;
@@ -1385,12 +1472,14 @@ export interface components {
          * ZoneOut
          * @description Zona `[low, high)` tal como la calcula `app.metrics.zones.Zone`.
          *
-         *     Unidades: vatios en las zonas de potencia y ppm en las de FC. `high` null: sin límite.
+         *     Unidades: vatios en las zonas de potencia, ppm en las de FC y s/km en las de ritmo.
+         *     `high` null: sin límite. En las de ritmo un número mayor es más lento: `low` es el límite
+         *     rápido (incluido) y `high` el lento (excluido), así que la Z1 no tiene `high`.
          */
         ZoneOut: {
             /**
              * Code
-             * @description Código de la zona: Z1…Z7 (potencia) o Z1…Z5c (FC).
+             * @description Código: Z1…Z7 (potencia), Z1…Z5c (FC de 7 zonas) o Z1…Z5 (5 zonas).
              */
             code: string;
             /** High */
@@ -1409,9 +1498,16 @@ export interface components {
          * ZonesOut
          * @description Zonas calculadas a partir del umbral vigente. Null si falta el umbral correspondiente.
          *
+         *     Referencia de cada disciplina: `power` (ciclismo), `running_pace` (carrera) y `trail_hr`
+         *     (trail).
+         *
          *     - `power`: 7 zonas de Coggan sobre `ftp_w` (W).
-         *     - `hr_cycling` / `hr_running`: 7 zonas de Friel sobre `lthr_bpm` (ppm), tabla de ciclismo
-         *       y de carrera.
+         *     - `running_pace`: 5 zonas de ritmo de Friel sobre `threshold_pace_s_per_km` (s/km; la app
+         *       lo muestra en min/km).
+         *     - `trail_hr`: 5 zonas de FC de Friel sobre `running_lthr_bpm` (ppm).
+         *     - `hr_cycling`: 7 zonas de Friel sobre `cycling_lthr_bpm` (ppm). Las usa la carga por FC de
+         *       ciclismo; la app no las muestra.
+         *     - `hr_running`: 7 zonas de Friel (tabla de carrera) sobre `running_lthr_bpm` (ppm).
          */
         ZonesOut: {
             /** Hr Cycling */
@@ -1420,6 +1516,10 @@ export interface components {
             hr_running: components["schemas"]["ZoneOut"][] | null;
             /** Power */
             power: components["schemas"]["ZoneOut"][] | null;
+            /** Running Pace */
+            running_pace: components["schemas"]["ZoneOut"][] | null;
+            /** Trail Hr */
+            trail_hr: components["schemas"]["ZoneOut"][] | null;
         };
     };
     responses: never;

@@ -140,7 +140,8 @@ export default function DashboardScreen({ navigation }: Props) {
               <>
                 <Text style={styles.muted}>Desde {formatDate(data.threshold.value.threshold.effective_from)}</Text>
                 <InfoRow label="FTP" value={data.threshold.value.threshold.ftp_w != null ? `${data.threshold.value.threshold.ftp_w} W` : '—'} />
-                <InfoRow label="FC umbral" value={data.threshold.value.threshold.lthr_bpm != null ? `${data.threshold.value.threshold.lthr_bpm} ppm` : '—'} />
+                <InfoRow label="FC umbral ciclismo" value={data.threshold.value.threshold.cycling_lthr_bpm != null ? `${data.threshold.value.threshold.cycling_lthr_bpm} ppm` : '—'} />
+                <InfoRow label="FC umbral carrera" value={data.threshold.value.threshold.running_lthr_bpm != null ? `${data.threshold.value.threshold.running_lthr_bpm} ppm` : '—'} />
                 <InfoRow label="Ritmo umbral" value={data.threshold.value.threshold.threshold_pace_s_per_km != null ? `${formatPace(data.threshold.value.threshold.threshold_pace_s_per_km)} /km` : '—'} />
               </>
             ) : null}
