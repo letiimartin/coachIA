@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authService } from '../services/authService';
-import { Zap } from 'lucide-react-native';
+import { colors, fonts, layout, lines, radius, spacing, typography } from '../ui/theme';
 
 export default function AuthScreen({ onLogin }) {
     const [email, setEmail] = useState('');
@@ -67,7 +67,6 @@ export default function AuthScreen({ onLogin }) {
                         keyboardShouldPersistTaps="handled"
                     >
                         <View style={styles.logoContainer}>
-                            <Zap size={64} color="#00f2ff" />
                             <Text style={styles.title}>LetiSmartCoach</Text>
                             <Text style={styles.subtitle}>Mobile Phase 1</Text>
                         </View>
@@ -83,7 +82,7 @@ export default function AuthScreen({ onLogin }) {
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Nombre Completo"
-                                    placeholderTextColor="#909090"
+                                    placeholderTextColor={colors.textDisabled}
                                     value={fullName}
                                     onChangeText={setFullName}
                                     autoCapitalize="words"
@@ -93,7 +92,7 @@ export default function AuthScreen({ onLogin }) {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Email"
-                                placeholderTextColor="#909090"
+                                placeholderTextColor={colors.textDisabled}
                                 value={email}
                                 onChangeText={(text) => setEmail(text.trim())}
                                 autoCapitalize="none"
@@ -102,7 +101,7 @@ export default function AuthScreen({ onLogin }) {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Password"
-                                placeholderTextColor="#909090"
+                                placeholderTextColor={colors.textDisabled}
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry
@@ -114,7 +113,7 @@ export default function AuthScreen({ onLogin }) {
                                 disabled={loading}
                             >
                                 {loading ? (
-                                    <ActivityIndicator color="#000" />
+                                    <ActivityIndicator color={colors.onPrimary} />
                                 ) : (
                                     <Text style={styles.buttonText}>
                                         {isSignUp ? 'Crear Cuenta' : 'Entrar'}
@@ -142,81 +141,74 @@ export default function AuthScreen({ onLogin }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0a0a0c',
+        backgroundColor: colors.background,
     },
     scrollContent: {
         flexGrow: 1,
-        padding: 24,
+        padding: spacing.xl,
         justifyContent: 'center',
+        width: '100%',
+        maxWidth: layout.formMaxWidth,
+        alignSelf: 'center',
     },
     logoContainer: {
-        alignItems: 'center',
-        marginBottom: 48,
+        marginBottom: spacing.xxxl,
+        gap: spacing.xs,
     },
     title: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#e0e0e0',
-        marginTop: 16,
+        ...typography.display,
+        color: colors.text,
     },
     subtitle: {
-        fontSize: 16,
-        color: '#909090',
-        marginTop: 4,
+        ...typography.body,
+        color: colors.textSecondary,
     },
     form: {
-        gap: 16,
+        gap: spacing.lg,
     },
     messageBox: {
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 8,
+        padding: spacing.md,
+        borderRadius: radius.sm,
     },
     errorBox: {
-        backgroundColor: 'rgba(255, 69, 58, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 69, 58, 0.3)',
+        backgroundColor: colors.dangerSurface,
     },
     successBox: {
-        backgroundColor: 'rgba(48, 209, 88, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(48, 209, 88, 0.3)',
+        backgroundColor: colors.surfaceSoft,
     },
     messageText: {
-        color: '#fff',
-        fontSize: 14,
-        textAlign: 'center',
+        ...typography.small,
+        color: colors.text,
     },
     input: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 12,
-        padding: 16,
-        color: '#fff',
-        fontSize: 16,
+        ...typography.body,
+        color: colors.text,
+        borderWidth: lines.hairline,
+        borderColor: colors.separatorStrong,
+        borderRadius: radius.sm,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
     },
     button: {
-        backgroundColor: '#00f2ff',
-        borderRadius: 12,
-        padding: 18,
+        backgroundColor: colors.primary,
+        borderRadius: radius.sm,
         alignItems: 'center',
-        marginTop: 8,
-        height: 58,
         justifyContent: 'center',
+        minHeight: 48,
+        marginTop: spacing.sm,
     },
     buttonDisabled: {
-        opacity: 0.6,
+        opacity: 0.45,
     },
     buttonText: {
-        color: '#000',
-        fontWeight: 'bold',
-        fontSize: 16,
+        fontFamily: fonts.bold,
+        fontSize: typography.body.fontSize,
+        color: colors.onPrimary,
     },
     switchText: {
-        color: '#00f2ff',
+        ...typography.smallBold,
+        color: colors.textActive,
         textAlign: 'center',
-        marginTop: 16,
-        fontSize: 14,
+        marginTop: spacing.sm,
     },
 });

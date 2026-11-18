@@ -15,7 +15,7 @@ import type {
   TrainingImpact,
 } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
-import { Button, Card, Chips, Field, Screen, styles, SwitchField } from '../../ui/components';
+import { Button, Section, Chips, Field, Screen, styles, SwitchField } from '../../ui/components';
 import { confirm } from '../../ui/confirm';
 import { isoToLocalParts, isValidIsoDate, isValidTime, localDateTimeToIso, todayIsoDate } from '../../ui/dates';
 import { parseOptionalNumber } from '../../ui/forms';
@@ -170,7 +170,7 @@ export default function EventFormScreen({ navigation, route }: Props) {
 
   return (
     <Screen error={error} onDismissError={() => setError(null)} title={event ? 'Editar evento' : 'Nuevo evento'} onBack={navigation.goBack}>
-      <Card>
+      <Section>
         <Chips label="Tipo" options={options(EVENT_KIND_LABELS)} value={form.kind} onChange={(v) => set('kind', v)} />
         <Field label="Título" value={form.title} onChangeText={(v) => set('title', v)} />
         <SwitchField label="Todo el día" value={form.all_day} onValueChange={(v) => set('all_day', v)} />
@@ -201,10 +201,10 @@ export default function EventFormScreen({ navigation, route }: Props) {
           onChange={(v) => set('training_impact', v)}
         />
         <Field label="Notas" value={form.notes} onChangeText={(v) => set('notes', v)} multiline />
-      </Card>
+      </Section>
 
       {form.kind === 'race' ? (
-        <Card title="Datos de la carrera">
+        <Section title="Datos de la carrera">
           {event?.race ? <Text style={styles.muted}>Estado: {ENRICHMENT_STATUS_LABELS[event.race.enrichment_status]}</Text> : null}
           {event?.race?.enrichment_status === 'pending_review' ? (
             <Button title="Confirmar datos completados" variant="secondary" onPress={confirmRaceData} loading={busy === 'confirm'} disabled={!!busy} />
@@ -215,7 +215,7 @@ export default function EventFormScreen({ navigation, route }: Props) {
           <Chips label="Prioridad" options={options(RACE_PRIORITY_LABELS)} value={form.priority} onChange={(v) => set('priority', v)} />
           <Field label="Objetivo" value={form.goal} onChangeText={(v) => set('goal', v)} multiline />
           <Field label="Web oficial" value={form.source_url} onChangeText={(v) => set('source_url', v)} placeholder="https://…" keyboardType="url" />
-        </Card>
+        </Section>
       ) : null}
 
       <Button title={event ? 'Guardar cambios' : 'Crear evento'} onPress={save} loading={busy === 'save'} disabled={!!busy} />

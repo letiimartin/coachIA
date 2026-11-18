@@ -4,32 +4,30 @@
  * Cada bloque se carga por separado: un fallo en uno no bloquea el resto.
  */
 import React, { useCallback } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
-import { Bot } from 'lucide-react-native';
 
 import { athleteApi, calendarApi } from '../../api/athleteApi';
 import { ApiError, errorText } from '../../api/errors';
 import { integrationsApi } from '../../api/integrationsApi';
 import type { CalendarEventOut, CurrentThresholdOut, IntegrationOut, ProfileOut } from '../../api/types';
-import { Button, Card, InfoRow, Loading, PendingFeature, Screen, styles } from '../../ui/components';
+import { Button, Card, IconButton, InfoRow, Loading, PendingFeature, Screen, Section, styles } from '../../ui/components';
 import { addDays, formatDate, formatDateTime, formatPace, todayIsoDate } from '../../ui/dates';
 import { EVENT_KIND_LABELS } from '../../ui/labels';
-import { colors } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
 type Props = { navigation: NavigationProp<ParamListBase> };
 
-type Section<T> = { ok: true; value: T } | { ok: false; error: string };
+type Loaded<T> = { ok: true; value: T } | { ok: false; error: string };
 
 type DashboardData = {
-  profile: Section<ProfileOut>;
-  threshold: Section<CurrentThresholdOut | null>;
-  events: Section<CalendarEventOut[]>;
-  integrations: Section<IntegrationOut[]>;
+  profile: Loaded<ProfileOut>;
+  threshold: Loaded<CurrentThresholdOut | null>;
+  events: Loaded<CalendarEventOut[]>;
+  integrations: Loaded<IntegrationOut[]>;
 };
 
-async function section<T>(promise: Promise<T>): Promise<Section<T>> {
+async function section<T>(promise: Promise<T>): Promise<Loaded<T>> {
   try {
     return { ok: true, value: await promise };
   } catch (e) {
@@ -55,7 +53,7 @@ async function loadDashboard(): Promise<DashboardData> {
 }
 
 function SectionError({ message }: { message: string }) {
-  return <Text style={{ color: colors.danger, fontSize: 13 }}>{message}</Text>;
+  return <Text style={styles.errorInline}>{message}</Text>;
 }
 
 /** Días naturales desde hoy hasta la fecha local del evento. */
@@ -85,52 +83,50 @@ export default function DashboardScreen({ navigation }: Props) {
       onDismissError={() => setError(null)}
       refreshing={loading && !!data}
       onRefresh={reload}
-      right={
-        <Pressable onPress={() => navigation.navigate('CoachChat')} accessibilityRole="button" accessibilityLabel="Coach">
-          <Bot size={26} color={colors.primary} />
-        </Pressable>
-      }
+      right={<IconButton icon="coach" label="Coach" onPress={() => navigation.navigate('Coach')} />}
     >
       {loading && !data ? <Loading /> : null}
       {data ? (
         <>
           {!data.profile.ok ? (
-            <Card title="Perfil">
+            <Section title="Perfil">
               <SectionError message={data.profile.error} />
-            </Card>
+            </Section>
           ) : null}
 
-          <PendingFeature title="Entreno de hoy">
-            La planificación de sesiones todavía no está disponible en la API. Aquí aparecerá el entreno del día cuando exista.
-          </PendingFeature>
+          <Card title="Entreno de hoy">
+            <Text style={styles.text}>
+              La planificación de sesiones todavía no está disponible en la API. Aquí aparecerá el entreno del día cuando exista.
+            </Text>
+          </Card>
 
-          <Card
+          <Section
             title="Próxima carrera"
-            right={<Button title="Calendario" variant="secondary" onPress={() => navigation.navigate('Calendario')} />}
+            right={<Button title="Plan" variant="text" onPress={() => navigation.navigate('Plan')} />}
           >
             {!data.events.ok ? <SectionError message={data.events.error} /> : null}
             {data.events.ok && !nextRace ? <Text style={styles.muted}>No hay carreras en los próximos 12 meses.</Text> : null}
             {nextRace ? (
               <>
-                <Text style={[styles.text, { fontSize: 16, fontWeight: '700' }]}>{nextRace.title}</Text>
+                <Text style={styles.textStrong}>{nextRace.title}</Text>
                 <InfoRow label="Fecha" value={formatDateTime(nextRace.start_at, nextRace.all_day)} />
                 <InfoRow label="Faltan" value={`${daysUntil(nextRace.start_at)} días`} />
                 {nextRace.race ? <InfoRow label="Prioridad" value={nextRace.race.priority} /> : null}
               </>
             ) : null}
-          </Card>
+          </Section>
 
-          <Card title="Próximos 7 días">
+          <Section title="Próximos 7 días">
             {!data.events.ok ? <SectionError message={data.events.error} /> : null}
             {data.events.ok && thisWeek.length === 0 ? <Text style={styles.muted}>Sin eventos esta semana.</Text> : null}
             {thisWeek.map((e) => (
               <InfoRow key={e.id} label={`${formatDateTime(e.start_at, e.all_day)} · ${EVENT_KIND_LABELS[e.kind]}`} value={e.title} />
             ))}
-          </Card>
+          </Section>
 
-          <Card
+          <Section
             title="Umbral vigente"
-            right={<Button title="Ver zonas" variant="secondary" onPress={() => navigation.navigate('Thresholds')} />}
+            right={<Button title="Ver zonas" variant="text" onPress={() => navigation.navigate('Thresholds')} />}
           >
             {!data.threshold.ok ? <SectionError message={data.threshold.error} /> : null}
             {data.threshold.ok && !data.threshold.value ? (
@@ -144,15 +140,15 @@ export default function DashboardScreen({ navigation }: Props) {
                 <InfoRow label="Ritmo umbral" value={data.threshold.value.threshold.threshold_pace_s_per_km != null ? `${formatPace(data.threshold.value.threshold.threshold_pace_s_per_km)} /km` : '—'} />
               </>
             ) : null}
-          </Card>
+          </Section>
 
           <PendingFeature title="Carga y resumen semanal">
             Las métricas de carga (TSS, horas, tendencias) se calcularán en la API a partir de las actividades sincronizadas. Aún no hay endpoint.
           </PendingFeature>
 
-          <Card
+          <Section
             title="Wahoo"
-            right={<Button title="Gestionar" variant="secondary" onPress={() => navigation.navigate('Integrations')} />}
+            right={<Button title="Gestionar" variant="text" onPress={() => navigation.navigate('Integrations')} />}
           >
             {!data.integrations.ok ? <SectionError message={data.integrations.error} /> : null}
             {data.integrations.ok ? (
@@ -162,7 +158,7 @@ export default function DashboardScreen({ navigation }: Props) {
                   : 'Sin conectar.'}
               </Text>
             ) : null}
-          </Card>
+          </Section>
         </>
       ) : null}
       <View />

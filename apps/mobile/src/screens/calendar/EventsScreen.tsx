@@ -1,14 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
-import { Plus } from 'lucide-react-native';
 
 import { calendarApi } from '../../api/athleteApi';
 import type { CalendarEventOut } from '../../api/types';
-import { Button, Card, Chips, Field, Loading, Screen, styles } from '../../ui/components';
+import { Button, Chips, Field, IconButton, Loading, Screen, Section, styles } from '../../ui/components';
 import { addDays, formatDateTime, isValidIsoDate, todayIsoDate } from '../../ui/dates';
 import { EVENT_KIND_LABELS, RACE_DISCIPLINE_LABELS, TRAINING_IMPACT_LABELS } from '../../ui/labels';
-import { colors } from '../../ui/theme';
+import { colors, lines, spacing } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
 type Props = { navigation: NavigationProp<ParamListBase> };
@@ -34,11 +33,10 @@ function EventItem({ event, onPress }: { event: CalendarEventOut; onPress: () =>
         .join(' · ')
     : null;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-          <Text style={[styles.text, { fontSize: 16, fontWeight: '700', flex: 1 }]}>{event.title}</Text>
-          <Text style={{ color: colors.primary, fontSize: 12 }}>{EVENT_KIND_LABELS[event.kind]}</Text>
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [local.item, pressed && local.pressed]}>
+        <View style={local.itemHeader}>
+          <Text style={[styles.textStrong, local.itemTitle]}>{event.title}</Text>
+          <Text style={styles.textActive}>{EVENT_KIND_LABELS[event.kind]}</Text>
         </View>
         <Text style={styles.muted}>
           {formatDateTime(event.start_at, event.all_day)}
@@ -46,7 +44,6 @@ function EventItem({ event, onPress }: { event: CalendarEventOut; onPress: () =>
         </Text>
         {raceInfo ? <Text style={styles.text}>{raceInfo}</Text> : null}
         {event.training_impact !== 'none' ? <Text style={styles.muted}>{TRAINING_IMPACT_LABELS[event.training_impact]}</Text> : null}
-      </Card>
     </Pressable>
   );
 }
@@ -75,29 +72,38 @@ export default function EventsScreen({ navigation }: Props) {
 
   return (
     <Screen
-      title="Calendario"
+      title="Plan"
       error={error}
       onDismissError={() => setError(null)}
       refreshing={loading && !!events}
       onRefresh={reload}
-      right={
-        <Pressable onPress={() => navigation.navigate('EventForm', {})} accessibilityRole="button" accessibilityLabel="Nuevo evento">
-          <Plus size={26} color={colors.primary} />
-        </Pressable>
-      }
+      right={<IconButton icon="add" label="Nuevo evento" onPress={() => navigation.navigate('EventForm', {})} />}
     >
       <Chips options={PRESETS} value={preset} onChange={choosePreset} />
       {preset === 'custom' ? (
-        <Card>
+        <Section>
           <Field label="Desde" value={draft.from} onChangeText={(v) => setDraft((d) => ({ ...d, from: v }))} placeholder="AAAA-MM-DD" />
           <Field label="Hasta" value={draft.to} onChangeText={(v) => setDraft((d) => ({ ...d, to: v }))} placeholder="AAAA-MM-DD" />
           <Button title="Ver eventos" variant="secondary" onPress={applyCustom} />
-        </Card>
+        </Section>
       ) : null}
 
       {loading && !events ? <Loading /> : null}
       {events && events.length === 0 ? <Text style={styles.muted}>No hay eventos en este rango.</Text> : null}
-      {events?.map((e) => <EventItem key={e.id} event={e} onPress={() => navigation.navigate('EventForm', { event: e })} />)}
+      {events && events.length > 0 ? (
+        <View>
+          {events.map((e) => (
+            <EventItem key={e.id} event={e} onPress={() => navigation.navigate('EventForm', { event: e })} />
+          ))}
+        </View>
+      ) : null}
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  item: { gap: spacing.xs, paddingVertical: spacing.md, borderTopWidth: lines.hairline, borderTopColor: colors.separator },
+  pressed: { backgroundColor: colors.surfaceSoft },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.sm },
+  itemTitle: { flex: 1 },
+});
