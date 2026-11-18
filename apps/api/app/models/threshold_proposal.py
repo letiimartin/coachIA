@@ -1,7 +1,8 @@
 """Propuestas de umbral salidas de un test (#42). Sólo propuestas: no cambian ningún umbral.
 
-Al aceptarla se crea una fila nueva en `athlete_thresholds` (`source = test`) y la propuesta
-guarda su id. Al rechazarla no se toca nada más.
+Al aceptarla se crea una fila nueva en `athlete_thresholds` (`source = test`) o, si ya hay una
+en `test_date`, sólo se actualiza su FTP (#45); la propuesta guarda el id de esa fila y la fila
+el de la propuesta (`ftp_proposal_id`). Al rechazarla no se toca nada más.
 """
 
 import enum
@@ -22,6 +23,17 @@ class ProposalStatus(enum.StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+
+class AcceptAction(enum.StrEnum):
+    """Qué hace aceptar una propuesta (#45). No se guarda: se calcula en la vista previa."""
+
+    CREATE_ROW = "create_row"  # No hay umbrales en `test_date`: fila nueva `source = test`.
+    UPDATE_FTP = "update_ftp"  # Ya hay una fila en `test_date`: sólo cambia su `ftp_w`.
+
+
+class PreviewWarningCode(enum.StrEnum):
+    LATER_THRESHOLDS = "later_thresholds"
 
 
 class ThresholdProposal(TimestampMixin, Base):
@@ -45,12 +57,14 @@ class ThresholdProposal(TimestampMixin, Base):
     # Métricas del bloque detectado (potencia media y normalizada, FC, % de datos válidos…).
     metrics: Mapped[dict[str, Any]] = json_column()
     proposed_ftp_w: Mapped[int]
-    # Avisos de calidad: lista de {code, message}.
+    # Avisos de calidad: criterios no bloqueantes que no se cumplen
+    # ({code, passed, blocking, measured, threshold, comparison, unit, message}).
     warnings: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, server_default=sa.text("'[]'::jsonb")
     )
     decided_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    # Umbral creado al aceptar. SET NULL: borrar ese umbral no borra el historial del test.
+    # Umbral creado o actualizado al aceptar.
+    # SET NULL: borrar ese umbral no borra el historial del test.
     threshold_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("athlete_thresholds.id", ondelete="SET NULL")
     )

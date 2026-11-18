@@ -3,6 +3,28 @@
 // Los ejemplos se exportan sin tipar: algunos omiten campos nulos (p. ej. `high` en la última zona),
 // así que la capa de mock los normaliza antes de usarlos.
 export const contractExamples: Record<string, unknown[]> = {
+  "AcceptancePreviewOut": [
+    {
+      "action": "update_ftp",
+      "effective_from": "2026-11-15",
+      "effective_until": "2026-11-30",
+      "next_threshold": {
+        "effective_from": "2026-12-01",
+        "ftp_w": 235,
+        "id": "6e3d2c1b-0a9f-4b8c-9d7e-6f5a4b3c2d1e"
+      },
+      "previous_ftp_w": 220,
+      "proposal_id": "3f6c1d2e-8a4b-4c7d-9e1f-2a3b4c5d6e7f",
+      "proposed_ftp_w": 230,
+      "threshold_id": "5d2c1b0a-9e8f-4a7b-8c6d-5e4f3a2b1c0d",
+      "warnings": [
+        {
+          "code": "later_thresholds",
+          "message": "Hay umbrales registrados desde el 2026-12-01: el FTP nuevo sólo regirá hasta el 2026-11-30 y después seguirá vigente el de ese registro (235 W)."
+        }
+      ]
+    }
+  ],
   "CalendarEventCreate": [
     {
       "all_day": false,
@@ -427,6 +449,12 @@ export const contractExamples: Record<string, unknown[]> = {
       "weight_kg": 58.5
     }
   ],
+  "ThresholdProposalAccept": [
+    {
+      "action": "update_ftp",
+      "previous_ftp_w": 220
+    }
+  ],
   "ThresholdProposalCreate": [
     {
       "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
@@ -457,7 +485,18 @@ export const contractExamples: Record<string, unknown[]> = {
       "status": "pending",
       "test_date": "2026-11-15",
       "updated_at": "2026-11-15T10:00:00Z",
-      "warnings": []
+      "warnings": [
+        {
+          "blocking": false,
+          "code": "no_warmup",
+          "comparison": "ge",
+          "measured": 300,
+          "message": "El bloque empieza a los 5 min: no hay un calentamiento previo de al menos 10 min.",
+          "passed": false,
+          "threshold": 600,
+          "unit": "s"
+        }
+      ]
     }
   ],
   "WeekAvailability": [

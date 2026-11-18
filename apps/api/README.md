@@ -49,9 +49,11 @@ se cambia con `TEST_DB_PORT`. Para empezar de cero, páralo y borra ese director
 | `GET /v1/integrations` | JWT de Supabase | Estado de las integraciones (nunca devuelve tokens) |
 | `GET /v1/integrations/wahoo/authorize-url?platform=mobile\|web` | JWT de Supabase | URL para autorizar en Wahoo, con `state` firmado |
 | `DELETE /v1/integrations/wahoo` | JWT de Supabase | Desconecta Wahoo y borra los tokens |
-| `POST /v1/athlete/threshold-proposals` | JWT de Supabase | Test de FTP de 20 min: descarga el FIT de una actividad de Wahoo, detecta el bloque y crea una **propuesta** pendiente (no cambia ningún umbral) |
+| `POST /v1/athlete/threshold-proposals` | JWT de Supabase | Test de FTP de 20 min: descarga el FIT de una actividad de Wahoo, detecta el bloque y crea una **propuesta** pendiente (no cambia ningún umbral). Los 422 explican el criterio que falla |
+| `POST /v1/athlete/threshold-proposals/dry-run` | JWT de Supabase | Análisis de prueba: intervalo, métricas, FTP propuesto y evaluación de cada criterio de calidad, **sin crear la propuesta** |
 | `GET /v1/athlete/threshold-proposals[?status=]`, `GET …/{id}` | JWT de Supabase | Propuestas de umbral del atleta |
-| `POST /v1/athlete/threshold-proposals/{id}/accept` | JWT de Supabase | Crea un umbral nuevo (`source = test`) vigente desde el día del test; sin recálculo histórico |
+| `GET /v1/athlete/threshold-proposals/{id}/preview` | JWT de Supabase | Vista previa de aceptar: `create_row` o `update_ftp`, FTP anterior y propuesto, ventana de vigencia y aviso `later_thresholds` |
+| `POST /v1/athlete/threshold-proposals/{id}/accept` | JWT de Supabase | Confirma la vista previa (`action`, `previous_ftp_w`; 409 `preview_outdated` si cambió): crea un umbral `source = test` o cambia sólo el FTP de la fila de esa fecha. Los registros posteriores no se tocan; sin recálculo histórico |
 | `POST /v1/athlete/threshold-proposals/{id}/reject` | JWT de Supabase | Rechaza la propuesta; no toca nada más |
 | `GET /auth/wahoo/callback` | `state` firmado | Redirect URI de Wahoo: canjea el código y vuelve a la app con `?provider=wahoo&status=connected\|error` |
 | `GET /internal/ping` | `X-Internal-API-Key` | Comprobación para n8n (workflows en [`automation/n8n`](../../automation/n8n/README.md)) |

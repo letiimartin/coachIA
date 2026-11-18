@@ -152,6 +152,7 @@ _THRESHOLD_EXAMPLE: dict[str, Any] = {
     "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
     **_THRESHOLD_FIELDS,
     "legacy_lthr_bpm": None,
+    "ftp_proposal_id": None,
     "created_at": "2026-11-01T19:00:00Z",
     "updated_at": "2026-11-01T19:00:00Z",
 }
@@ -232,6 +233,13 @@ class ThresholdOut(BaseModel):
     weight_kg: float | None
     source: ThresholdSource
     notes: str | None
+    ftp_proposal_id: UUID | None = Field(
+        description=(
+            "Propuesta de test de la que sale `ftp_w`, si se aceptó una. Puede ir con"
+            " `source = manual` si el test sólo actualizó el FTP de una fila existente."
+        ),
+        json_schema_extra={"readOnly": True},
+    )
     created_at: datetime
     updated_at: datetime
 

@@ -22,10 +22,18 @@ class AppError(Exception):
     code = "internal_error"
     message = "Error interno del servidor."
 
-    def __init__(self, message: str | None = None, *, headers: dict[str, str] | None = None):
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+        details: Any = None,
+    ):
         super().__init__(message or self.message)
         self.message = message or self.message
         self.headers = headers
+        # Datos estructurados para el cliente (`error.details`). Nunca datos internos.
+        self.details = details
 
 
 class UnauthorizedError(AppError):
@@ -50,9 +58,16 @@ class NotFoundError(AppError):
 
 
 class ConflictError(AppError):
+    """`code` es configurable."""
+
     status_code = 409
     code = "conflict"
     message = "La operación no es posible en el estado actual."
+
+    def __init__(self, message: str | None = None, *, code: str | None = None, details: Any = None):
+        super().__init__(message, details=details)
+        if code is not None:
+            self.code = code
 
 
 class UnprocessableError(AppError):
@@ -62,8 +77,8 @@ class UnprocessableError(AppError):
     code = "unprocessable"
     message = "No se puede procesar la petición con estos datos."
 
-    def __init__(self, message: str | None = None, *, code: str | None = None):
-        super().__init__(message)
+    def __init__(self, message: str | None = None, *, code: str | None = None, details: Any = None):
+        super().__init__(message, details=details)
         if code is not None:
             self.code = code
 
@@ -114,7 +129,12 @@ def _body(request: Request, code: str, message: str, details: Any = None) -> dic
 async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     error = cast(AppError, exc)
     return JSONResponse(
-        _body(request, error.code, error.message),
+        _body(
+            request,
+            error.code,
+            error.message,
+            None if error.details is None else jsonable_encoder(error.details),
+        ),
         status_code=error.status_code,
         headers=error.headers,
     )

@@ -19,17 +19,22 @@ Tratamiento de los huecos (segundos sin registro o sin potencia):
   potencia) y como datos no válidos. Así, un bloque con una pausa larga sale penalizado y
   con aviso.
 
-Avisos de calidad (no impiden la propuesta, pero la atleta los ve antes de aceptarla):
+Criterios de calidad. Cada uno se evalúa con un valor medido y un umbral, y el resultado
+(`QualityCheck`) dice si se cumple, si bloquea la propuesta o sólo avisa y un mensaje legible.
 
-- ``data_gaps``: hay huecos largos dentro del bloque.
+Bloquean la propuesta (`ThresholdTestError`, cuyo `code` es el del criterio):
+
+- ``test_too_short``: la actividad dura menos que el test (``FTP_20MIN_DURATION_S``).
+- ``no_power_data``: no hay potencia (potencia media del mejor bloque de 0 W).
+- ``insufficient_data``: menos de ``MIN_VALID_FRACTION`` de datos válidos en el mejor bloque.
+
+Sólo avisan (la atleta los ve antes de aceptar la propuesta):
+
+- ``data_gaps``: hay huecos de más de ``MAX_FILLED_GAP_S`` segundos dentro del bloque.
 - ``pauses``: hay tramos de ``PAUSE_MIN_S`` segundos o más a 0 W dentro del bloque.
 - ``high_variability``: el índice de variabilidad (NP / potencia media) supera
   ``VARIABILITY_LIMIT``; un test bien hecho es un esfuerzo constante.
 - ``no_warmup``: el bloque empieza menos de ``MIN_WARMUP_S`` segundos después del inicio.
-
-Errores (`ThresholdTestError`, con mensaje apto para el cliente): actividad más corta que el
-test, sin datos de potencia o con menos de ``MIN_VALID_FRACTION`` de datos válidos en el
-mejor bloque.
 """
 
 import enum
@@ -52,33 +57,76 @@ class ThresholdProtocol(enum.StrEnum):
     FTP_20MIN = "ftp_20min"
 
 
-class QualityWarningCode(enum.StrEnum):
+class QualityCriterion(enum.StrEnum):
+    """Criterios de calidad del test. Los tres primeros bloquean la propuesta."""
+
+    TEST_TOO_SHORT = "test_too_short"
+    NO_POWER_DATA = "no_power_data"
+    INSUFFICIENT_DATA = "insufficient_data"
     DATA_GAPS = "data_gaps"
     PAUSES = "pauses"
     HIGH_VARIABILITY = "high_variability"
     NO_WARMUP = "no_warmup"
 
 
+class Comparison(enum.StrEnum):
+    """Condición que cumple el valor medido frente al umbral cuando el criterio se cumple."""
+
+    GT = "gt"
+    GE = "ge"
+    LT = "lt"
+    LE = "le"
+
+
+@dataclass(frozen=True, slots=True)
+class QualityCheck:
+    """Evaluación de un criterio: se cumple si `measured <comparison> threshold`.
+
+    `unit`: `s`, `W`, `%` o vacío (adimensional, como el índice de variabilidad).
+    """
+
+    criterion: QualityCriterion
+    measured: float
+    threshold: float
+    comparison: Comparison
+    unit: str
+    blocking: bool
+    message: str
+
+    @property
+    def passed(self) -> bool:
+        measured, limit = self.measured, self.threshold
+        match self.comparison:
+            case Comparison.GT:
+                return measured > limit
+            case Comparison.GE:
+                return measured >= limit
+            case Comparison.LT:
+                return measured < limit
+            case Comparison.LE:
+                return measured <= limit
+
+
 class ThresholdTestError(Exception):
-    """El test no se puede analizar. `code` es estable; el mensaje, apto para el cliente."""
+    """El test no se puede analizar: `check` es el criterio bloqueante que no se cumple."""
 
-    code = "test_not_analyzable"
-
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
+    def __init__(self, check: QualityCheck):
+        super().__init__(check.message)
+        self.check = check
+        self.code = check.criterion.value
+        self.message = check.message
 
 
 class ActivityTooShortError(ThresholdTestError):
-    code = "test_too_short"
+    pass
 
 
 class NoPowerDataError(ThresholdTestError):
-    code = "no_power_data"
+    pass
 
 
 class InsufficientDataError(ThresholdTestError):
-    code = "insufficient_data"
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,12 +136,6 @@ class Sample:
     offset_s: float
     power_w: float | None
     heart_rate_bpm: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class QualityWarning:
-    code: QualityWarningCode
-    message: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +153,12 @@ class FtpTestResult:
     valid_data_pct: float
     warmup_s: int
     proposed_ftp_w: int
-    warnings: tuple[QualityWarning, ...]
+    # Todos los criterios evaluados, en orden; `warnings`, los que avisan y no se cumplen.
+    checks: tuple[QualityCheck, ...]
+
+    @property
+    def warnings(self) -> tuple[QualityCheck, ...]:
+        return tuple(check for check in self.checks if not check.passed)
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,11 +235,11 @@ def normalized_power(power: Sequence[float]) -> float:
     return float((sum(fourth_powers) / len(fourth_powers)) ** 0.25)
 
 
-def _longest_zero_run(values: Sequence[float | None]) -> int:
-    """Segundos seguidos a 0 W (con dato) más largos."""
+def _longest_run(values: Sequence[float | None], target: float | None) -> int:
+    """Segundos seguidos más largos con el valor `target` (0 para pausas, None para huecos)."""
     longest = current = 0
     for value in values:
-        current = current + 1 if value == 0 else 0
+        current = current + 1 if value == target else 0
         longest = max(longest, current)
     return longest
 
@@ -201,66 +248,151 @@ def _round_half_up(value: float) -> int:
     return math.floor(value + 0.5)
 
 
+def _minutes(seconds: float) -> str:
+    return f"{seconds / 60:.1f}".rstrip("0").rstrip(".")
+
+
+def _duration_check(duration_s: int) -> QualityCheck:
+    limit = FTP_20MIN_DURATION_S
+    if duration_s >= limit:
+        message = f"La actividad dura {_minutes(duration_s)} min (mínimo {_minutes(limit)} min)."
+    elif duration_s == 0:
+        message = "La actividad no tiene registros."
+    else:
+        message = (
+            f"La actividad dura {_minutes(duration_s)} min: menos que los"
+            f" {_minutes(limit)} min del test."
+        )
+    return QualityCheck(
+        QualityCriterion.TEST_TOO_SHORT, duration_s, limit, Comparison.GE, "s", True, message
+    )
+
+
+def _power_check(avg_power_w: float) -> QualityCheck:
+    message = (
+        f"Potencia media del bloque: {avg_power_w:.0f} W."
+        if avg_power_w > 0
+        else "La actividad no tiene datos de potencia."
+    )
+    return QualityCheck(
+        QualityCriterion.NO_POWER_DATA,
+        round(avg_power_w, 1),
+        0,
+        Comparison.GT,
+        "W",
+        True,
+        message,
+    )
+
+
+def _valid_data_check(valid_pct: float) -> QualityCheck:
+    limit = MIN_VALID_FRACTION * 100
+    measured = round(valid_pct, 1)
+    message = (
+        f"{measured:.1f} % del bloque tiene datos de potencia (mínimo {limit:.0f} %)."
+        if measured >= limit
+        else f"Sólo {measured:.1f} % del mejor bloque de 20 minutos tiene datos de potencia"
+        f" (mínimo {limit:.0f} %): hay demasiados huecos."
+    )
+    return QualityCheck(
+        QualityCriterion.INSUFFICIENT_DATA, measured, limit, Comparison.GE, "%", True, message
+    )
+
+
+def _gaps_check(longest_gap_s: int, missing_s: int, valid_pct: float) -> QualityCheck:
+    limit = MAX_FILLED_GAP_S
+    message = (
+        f"Sin huecos de más de {limit} s en el bloque."
+        if longest_gap_s <= limit
+        else f"Hay huecos sin potencia de hasta {longest_gap_s} s en el bloque (se toleran"
+        f" {limit} s); faltan datos en {missing_s} s ({valid_pct:.1f} % de datos válidos)."
+    )
+    return QualityCheck(
+        QualityCriterion.DATA_GAPS, longest_gap_s, limit, Comparison.LE, "s", False, message
+    )
+
+
+def _pauses_check(longest_pause_s: int) -> QualityCheck:
+    limit = PAUSE_MIN_S
+    message = (
+        f"Sin pausas de {limit} s o más a 0 W en el bloque."
+        if longest_pause_s < limit
+        else f"Hay una pausa de {longest_pause_s} s a 0 W dentro del bloque (avisa a partir"
+        f" de {limit} s)."
+    )
+    return QualityCheck(
+        QualityCriterion.PAUSES, longest_pause_s, limit, Comparison.LT, "s", False, message
+    )
+
+
+def _variability_check(variability: float) -> QualityCheck:
+    limit = VARIABILITY_LIMIT
+    measured = round(variability, 3)
+    # El criterio se evalúa sobre el valor redondeado que se muestra, para que sean coherentes.
+    message = (
+        f"Esfuerzo constante (NP / media = {measured:.3f}; máximo {limit:.2f})."
+        if measured <= limit
+        else f"Variabilidad alta (NP / media = {measured:.3f}; máximo {limit:.2f}): el test"
+        " debería ser un esfuerzo constante."
+    )
+    return QualityCheck(
+        QualityCriterion.HIGH_VARIABILITY, measured, limit, Comparison.LE, "", False, message
+    )
+
+
+def _warmup_check(warmup_s: int) -> QualityCheck:
+    limit = MIN_WARMUP_S
+    message = (
+        f"Calentamiento de {_minutes(warmup_s)} min antes del bloque (mínimo"
+        f" {_minutes(limit)} min)."
+        if warmup_s >= limit
+        else f"El bloque empieza a los {_minutes(warmup_s)} min: no hay un calentamiento previo"
+        f" de al menos {_minutes(limit)} min."
+    )
+    return QualityCheck(
+        QualityCriterion.NO_WARMUP, warmup_s, limit, Comparison.GE, "s", False, message
+    )
+
+
+def _require(check: QualityCheck, error: type[ThresholdTestError]) -> QualityCheck:
+    if not check.passed:
+        raise error(check)
+    return check
+
+
 def analyze_ftp_20min(samples: Sequence[Sample]) -> FtpTestResult:
-    """Detecta el mejor bloque de 20 minutos y propone el FTP (95 % de su potencia media)."""
+    """Detecta el mejor bloque de 20 minutos y propone el FTP (95 % de su potencia media).
+
+    Lanza `ThresholdTestError` (con el criterio que falla) si un criterio bloqueante no se
+    cumple; los demás criterios quedan en `checks` y, si no se cumplen, en `warnings`.
+    """
     window = FTP_20MIN_DURATION_S
     if not samples:
-        raise ActivityTooShortError("La actividad no tiene registros.")
+        raise ActivityTooShortError(_duration_check(0))
     grid = _grid(samples)
-    if len(grid.power) < window:
-        raise ActivityTooShortError("La actividad dura menos que los 20 minutos del test.")
+    checks = [_require(_duration_check(len(grid.power)), ActivityTooShortError)]
     if all(value is None for value in grid.power):
-        raise NoPowerDataError("La actividad no tiene datos de potencia.")
+        raise NoPowerDataError(_power_check(0.0))
 
     start = _best_window(grid.power, window)
     block = grid.power[start : start + window]
     valid = sum(value is not None for value in block)
-    if valid < window * MIN_VALID_FRACTION:
-        raise InsufficientDataError(
-            "El mejor bloque de 20 minutos tiene demasiados huecos sin potencia."
-        )
+    valid_pct = valid / window * 100
+    valid_check = _require(_valid_data_check(valid_pct), InsufficientDataError)
     watts = [value or 0.0 for value in block]
     avg_power = sum(watts) / window
-    if avg_power <= 0:
-        raise NoPowerDataError("La actividad no tiene datos de potencia.")
+    checks.append(_require(_power_check(avg_power), NoPowerDataError))
+    checks.append(valid_check)
     np_w = normalized_power(watts)
     variability = np_w / avg_power
     heart_rates = [hr for hr in grid.heart_rate[start : start + window] if hr is not None]
-    valid_pct = valid / window * 100
 
-    warnings: list[QualityWarning] = []
-    if valid < window:
-        warnings.append(
-            QualityWarning(
-                QualityWarningCode.DATA_GAPS,
-                f"Faltan datos de potencia en {window - valid} s del bloque"
-                f" ({valid_pct:.1f} % de datos válidos).",
-            )
-        )
-    longest_pause = _longest_zero_run(block)
-    if longest_pause >= PAUSE_MIN_S:
-        warnings.append(
-            QualityWarning(
-                QualityWarningCode.PAUSES,
-                f"Hay una pausa de {longest_pause} s a 0 W dentro del bloque.",
-            )
-        )
-    if variability > VARIABILITY_LIMIT:
-        warnings.append(
-            QualityWarning(
-                QualityWarningCode.HIGH_VARIABILITY,
-                f"Variabilidad alta (NP / media = {variability:.2f}): el test debería ser un"
-                " esfuerzo constante.",
-            )
-        )
-    if start < MIN_WARMUP_S:
-        warnings.append(
-            QualityWarning(
-                QualityWarningCode.NO_WARMUP,
-                f"El bloque empieza a los {start // 60} min: no hay un calentamiento previo"
-                f" de al menos {MIN_WARMUP_S // 60} min.",
-            )
-        )
+    checks += [
+        _gaps_check(_longest_run(block, None), window - valid, valid_pct),
+        _pauses_check(_longest_run(block, 0)),
+        _variability_check(variability),
+        _warmup_check(start),
+    ]
 
     return FtpTestResult(
         protocol=ThresholdProtocol.FTP_20MIN,
@@ -274,5 +406,5 @@ def analyze_ftp_20min(samples: Sequence[Sample]) -> FtpTestResult:
         valid_data_pct=valid_pct,
         warmup_s=start,
         proposed_ftp_w=_round_half_up(avg_power * FTP_20MIN_FACTOR),
-        warnings=tuple(warnings),
+        checks=tuple(checks),
     )

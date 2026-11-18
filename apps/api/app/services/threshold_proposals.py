@@ -1,14 +1,23 @@
-"""Propuestas de umbral salidas de un test (#42): crear, listar, aceptar y rechazar.
+"""Propuestas de umbral salidas de un test (#42, #45): analizar, crear, previsualizar, aceptar
+y rechazar.
 
-La propuesta no cambia ningún umbral. Sólo al aceptarla se añade una fila a
-`athlete_thresholds` con `source = test`, a través de `thresholds.add_threshold`: el gancho
-normal rellena la carga de las actividades que no la tienen y regenera la forma, pero nunca
-cambia las cargas existentes (protección de #22). No hay recálculo histórico.
+La propuesta no cambia ningún umbral. Al aceptarla, según la vista previa:
+
+- `create_row`: si no hay umbrales en `test_date`, se añade una fila con `source = test`
+  (`thresholds.add_threshold`), con el FTP propuesto y el resto copiado del umbral vigente.
+- `update_ftp`: si ya hay una fila en `test_date`, sólo se cambia su `ftp_w`
+  (`thresholds.update_ftp`); el resto de valores se conservan.
+
+En los dos casos la fila apunta a la propuesta (`ftp_proposal_id`) y los registros posteriores
+no se tocan. Sólo corre el gancho normal: rellena la carga de las actividades que no la tienen
+y regenera la forma, pero nunca cambia las cargas existentes (protección de #22). **Aceptar
+nunca lanza el recálculo histórico** (`scripts/recompute_loads.py`): es otra decisión.
 """
 
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -20,7 +29,9 @@ from sqlalchemy.orm import Session
 from app.core.errors import ConflictError, NotFoundError, UnprocessableError
 from app.integrations.fit import FitError, parse_records
 from app.metrics.tests import (
+    Comparison,
     FtpTestResult,
+    QualityCheck,
     Sample,
     ThresholdProtocol,
     ThresholdTestError,
@@ -28,7 +39,7 @@ from app.metrics.tests import (
 )
 from app.models import Activity, ActivitySource, AthleteThreshold, Sport, ThresholdProposal
 from app.models.athlete import ThresholdSource
-from app.models.threshold_proposal import ProposalStatus
+from app.models.threshold_proposal import AcceptAction, PreviewWarningCode, ProposalStatus
 from app.services import thresholds
 from app.services.athletes import athlete_timezone
 
@@ -82,8 +93,25 @@ def _pending_exists(session: Session, activity_id: uuid.UUID, protocol: Threshol
     )
 
 
+def check_out(check: QualityCheck) -> dict[str, Any]:
+    """Criterio evaluado tal como lo ve el cliente (avisos, `checks` y `error.details`)."""
+    return {
+        "code": check.criterion.value,
+        "passed": check.passed,
+        "blocking": check.blocking,
+        "measured": check.measured,
+        "threshold": check.threshold,
+        "comparison": check.comparison.value,
+        "unit": check.unit,
+        "message": check.message,
+    }
+
+
 def _analyze(data: bytes) -> tuple[datetime, FtpTestResult]:
-    """Lee el FIT y analiza el test. Devuelve el instante del primer registro y el resultado."""
+    """Lee el FIT y analiza el test. Devuelve el instante del primer registro y el resultado.
+
+    Si falla un criterio bloqueante, 422 con su `code` y el criterio en `error.details`.
+    """
     try:
         records = parse_records(data)
     except FitError as exc:
@@ -100,8 +128,32 @@ def _analyze(data: bytes) -> tuple[datetime, FtpTestResult]:
     try:
         result = analyze_ftp_20min(samples)
     except ThresholdTestError as exc:
-        raise UnprocessableError(exc.message, code=exc.code) from exc
+        raise UnprocessableError(exc.message, code=exc.code, details=check_out(exc.check)) from exc
+    _check_ftp_range(result.proposed_ftp_w)
     return first, result
+
+
+def _check_ftp_range(ftp_w: int) -> None:
+    """422 `ftp_out_of_range` (con el detalle del límite) si el FTP no es admisible."""
+    if FTP_MIN_W <= ftp_w <= FTP_MAX_W:
+        return
+    limit, comparison = (
+        (FTP_MIN_W, Comparison.GE) if ftp_w < FTP_MIN_W else (FTP_MAX_W, Comparison.LE)
+    )
+    message = (
+        f"El FTP calculado ({ftp_w} W) está fuera del rango admitido ({FTP_MIN_W}-{FTP_MAX_W} W)."
+    )
+    details = {
+        "code": "ftp_out_of_range",
+        "passed": False,
+        "blocking": True,
+        "measured": ftp_w,
+        "threshold": limit,
+        "comparison": comparison.value,
+        "unit": "W",
+        "message": message,
+    }
+    raise UnprocessableError(message, code="ftp_out_of_range", details=details)
 
 
 def _metrics(result: FtpTestResult) -> dict[str, Any]:
@@ -122,19 +174,28 @@ def _metrics(result: FtpTestResult) -> dict[str, Any]:
     }
 
 
-def create_proposal(
-    session: Session,
-    user_id: uuid.UUID,
-    activity_id: uuid.UUID,
-    protocol: ThresholdProtocol,
-    fetch_fit: FitFetcher,
-) -> ThresholdProposal:
-    """Descarga el FIT de la actividad, detecta el test y guarda una propuesta pendiente.
+@dataclass(frozen=True, slots=True)
+class TestAnalysis:
+    """Resultado del análisis de una actividad, guardado o no como propuesta."""
 
-    404 si la actividad no es del atleta; 422 si no es de ciclismo, no tiene FIT o el FIT no
-    permite analizar el test; 409 si ya hay una propuesta pendiente de esa actividad. Los
-    errores del proveedor al descargar el FIT se propagan (los traduce el router).
-    """
+    __test__ = False  # No es un test de pytest.
+
+    activity_id: uuid.UUID
+    protocol: ThresholdProtocol
+    test_date: date
+    interval_start_at: datetime
+    interval_end_at: datetime
+    metrics: dict[str, Any]
+    proposed_ftp_w: int
+    checks: list[dict[str, Any]]
+    warnings: list[dict[str, Any]]
+
+
+def _test_activity(
+    session: Session, user_id: uuid.UUID, activity_id: uuid.UUID
+) -> tuple[str, date]:
+    """URL del FIT y día local de la actividad. 404 si no es del atleta; 422 si no es de
+    ciclismo o no tiene FIT."""
     activity = _get_activity(session, user_id, activity_id)
     if activity.sport != Sport.CYCLING:
         raise UnprocessableError(
@@ -146,32 +207,80 @@ def create_proposal(
         raise UnprocessableError(
             "La actividad no tiene un fichero FIT descargable.", code="fit_unavailable"
         )
-    if _pending_exists(session, activity_id, protocol):
-        raise ConflictError(_PENDING_EXISTS)
     tz = ZoneInfo(athlete_timezone(session, user_id))
-    test_date = activity.start_at.astimezone(tz).date()
+    return url, activity.start_at.astimezone(tz).date()
+
+
+def _run_analysis(
+    session: Session,
+    activity_id: uuid.UUID,
+    protocol: ThresholdProtocol,
+    url: str,
+    test_date: date,
+    fetch_fit: FitFetcher,
+) -> TestAnalysis:
     # No se mantiene abierta la transacción de lectura durante la descarga.
     session.rollback()
 
     first, result = _analyze(fetch_fit(url))
-    if not FTP_MIN_W <= result.proposed_ftp_w <= FTP_MAX_W:
-        raise UnprocessableError(
-            f"El FTP calculado ({result.proposed_ftp_w} W) está fuera del rango admitido"
-            f" ({FTP_MIN_W}-{FTP_MAX_W} W).",
-            code="ftp_out_of_range",
-        )
+    return TestAnalysis(
+        activity_id=activity_id,
+        protocol=protocol,
+        test_date=test_date,
+        interval_start_at=(first + timedelta(seconds=result.start_offset_s)).astimezone(UTC),
+        interval_end_at=(first + timedelta(seconds=result.end_offset_s)).astimezone(UTC),
+        metrics=_metrics(result),
+        proposed_ftp_w=result.proposed_ftp_w,
+        checks=[check_out(check) for check in result.checks],
+        warnings=[check_out(check) for check in result.warnings],
+    )
+
+
+def analyze_activity(
+    session: Session,
+    user_id: uuid.UUID,
+    activity_id: uuid.UUID,
+    protocol: ThresholdProtocol,
+    fetch_fit: FitFetcher,
+) -> TestAnalysis:
+    """Análisis de prueba (`dry-run`): descarga el FIT y analiza el test **sin guardar nada**.
+
+    Mismos errores que `create_proposal`, salvo el 409 de propuesta pendiente (no se crea).
+    """
+    url, test_date = _test_activity(session, user_id, activity_id)
+    return _run_analysis(session, activity_id, protocol, url, test_date, fetch_fit)
+
+
+def create_proposal(
+    session: Session,
+    user_id: uuid.UUID,
+    activity_id: uuid.UUID,
+    protocol: ThresholdProtocol,
+    fetch_fit: FitFetcher,
+) -> ThresholdProposal:
+    """Descarga el FIT de la actividad, detecta el test y guarda una propuesta pendiente.
+
+    404 si la actividad no es del atleta; 422 si no es de ciclismo, no tiene FIT o el FIT no
+    permite analizar el test (con el criterio que falla en `error.details`); 409 si ya hay una
+    propuesta pendiente de esa actividad. Los errores del proveedor al descargar el FIT se
+    propagan (los traduce el router).
+    """
+    url, test_date = _test_activity(session, user_id, activity_id)
+    if _pending_exists(session, activity_id, protocol):
+        raise ConflictError(_PENDING_EXISTS)
+    analysis = _run_analysis(session, activity_id, protocol, url, test_date, fetch_fit)
 
     proposal = ThresholdProposal(
         user_id=user_id,
         activity_id=activity_id,
         protocol=protocol,
         status=ProposalStatus.PENDING,
-        test_date=test_date,
-        interval_start_at=(first + timedelta(seconds=result.start_offset_s)).astimezone(UTC),
-        interval_end_at=(first + timedelta(seconds=result.end_offset_s)).astimezone(UTC),
-        metrics=_metrics(result),
-        proposed_ftp_w=result.proposed_ftp_w,
-        warnings=[{"code": w.code.value, "message": w.message} for w in result.warnings],
+        test_date=analysis.test_date,
+        interval_start_at=analysis.interval_start_at,
+        interval_end_at=analysis.interval_end_at,
+        metrics=analysis.metrics,
+        proposed_ftp_w=analysis.proposed_ftp_w,
+        warnings=analysis.warnings,
     )
     session.add(proposal)
     try:
@@ -233,7 +342,7 @@ _STATUS_TEXT = {
 
 
 def threshold_values(proposal: ThresholdProposal, base: AthleteThreshold | None) -> dict[str, Any]:
-    """Umbral que se crea al aceptar: el FTP propuesto y el resto copiado del vigente."""
+    """Fila que crea `create_row`: el FTP propuesto y el resto copiado del umbral vigente."""
     values: dict[str, Any] = {
         field: None if base is None else getattr(base, field) for field in _COPIED_FIELDS
     }
@@ -242,21 +351,141 @@ def threshold_values(proposal: ThresholdProposal, base: AthleteThreshold | None)
         ftp_w=proposal.proposed_ftp_w,
         source=ThresholdSource.TEST,
         notes=f"Test de FTP de 20 minutos (propuesta {proposal.id}).",
+        ftp_proposal_id=proposal.id,
     )
     return values
 
 
-def accept_proposal(
-    session: Session, user_id: uuid.UUID, proposal_id: uuid.UUID
-) -> ThresholdProposal:
-    """Crea el umbral nuevo (vigente desde `test_date`) y marca la propuesta como aceptada.
+@dataclass(frozen=True, slots=True)
+class NextThreshold:
+    id: uuid.UUID
+    effective_from: date
+    ftp_w: int | None
 
-    409 si la propuesta ya no está pendiente o si ya hay umbrales registrados en `test_date`
-    (no se sobrescriben: la atleta decide qué hacer con esa fila).
+
+@dataclass(frozen=True, slots=True)
+class PreviewWarning:
+    code: PreviewWarningCode
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptancePreview:
+    """Qué haría aceptar la propuesta con los umbrales actuales. Ver `AcceptancePreviewOut`."""
+
+    proposal_id: uuid.UUID
+    action: AcceptAction
+    threshold_id: uuid.UUID | None
+    previous_ftp_w: int | None
+    proposed_ftp_w: int
+    effective_from: date
+    effective_until: date | None
+    next_threshold: NextThreshold | None
+    warnings: list[PreviewWarning]
+
+
+@dataclass(frozen=True, slots=True)
+class _Plan:
+    preview: AcceptancePreview
+    # Umbral vigente en `test_date` (la fila de esa fecha si la hay) y la fila de esa fecha.
+    base: AthleteThreshold | None
+    row_on_date: AthleteThreshold | None
+
+
+def _plan(
+    session: Session, user_id: uuid.UUID, proposal: ThresholdProposal, *, lock: bool = False
+) -> _Plan:
+    """Calcula la vista previa. Con `lock`, bloquea la fila vigente en `test_date` hasta el commit."""
+    test_date = proposal.test_date
+    base_query = (
+        sa.select(AthleteThreshold)
+        .where(AthleteThreshold.user_id == user_id, AthleteThreshold.effective_from <= test_date)
+        .order_by(AthleteThreshold.effective_from.desc())
+        .limit(1)
+    )
+    if lock:
+        base_query = base_query.with_for_update()
+    base = session.scalar(base_query)
+    following = session.scalar(
+        sa.select(AthleteThreshold)
+        .where(AthleteThreshold.user_id == user_id, AthleteThreshold.effective_from > test_date)
+        .order_by(AthleteThreshold.effective_from)
+        .limit(1)
+    )
+    row_on_date = base if base is not None and base.effective_from == test_date else None
+
+    warnings: list[PreviewWarning] = []
+    next_threshold = None
+    effective_until = None
+    if following is not None:
+        next_threshold = NextThreshold(following.id, following.effective_from, following.ftp_w)
+        effective_until = following.effective_from - timedelta(days=1)
+        ftp_after = "sin FTP" if following.ftp_w is None else f"{following.ftp_w} W"
+        warnings.append(
+            PreviewWarning(
+                PreviewWarningCode.LATER_THRESHOLDS,
+                f"Hay umbrales registrados desde el {following.effective_from.isoformat()}: el"
+                f" FTP nuevo sólo regirá hasta el {effective_until.isoformat()} y después"
+                f" seguirá vigente el de ese registro ({ftp_after}). Los registros posteriores"
+                " no se modifican.",
+            )
+        )
+    preview = AcceptancePreview(
+        proposal_id=proposal.id,
+        action=AcceptAction.CREATE_ROW if row_on_date is None else AcceptAction.UPDATE_FTP,
+        threshold_id=None if row_on_date is None else row_on_date.id,
+        previous_ftp_w=None if base is None else base.ftp_w,
+        proposed_ftp_w=proposal.proposed_ftp_w,
+        effective_from=test_date,
+        effective_until=effective_until,
+        next_threshold=next_threshold,
+        warnings=warnings,
+    )
+    return _Plan(preview=preview, base=base, row_on_date=row_on_date)
+
+
+def preview_acceptance(
+    session: Session, user_id: uuid.UUID, proposal_id: uuid.UUID
+) -> AcceptancePreview:
+    """Vista previa de aceptar la propuesta. No guarda nada. 409 si no está pendiente."""
+    proposal = get_proposal(session, user_id, proposal_id)
+    if proposal.status != ProposalStatus.PENDING:
+        raise ConflictError(f"La propuesta ya está {_STATUS_TEXT[proposal.status]}.")
+    return _plan(session, user_id, proposal).preview
+
+
+def accept_proposal(
+    session: Session,
+    user_id: uuid.UUID,
+    proposal_id: uuid.UUID,
+    action: AcceptAction,
+    previous_ftp_w: int | None,
+) -> ThresholdProposal:
+    """Aplica la propuesta tal como la mostró la vista previa y la marca como aceptada.
+
+    `action` y `previous_ftp_w` son los de la vista previa que vio la atleta: si ya no
+    coinciden (los umbrales cambiaron entretanto), 409 `preview_outdated` con la vista previa
+    nueva en `error.details` y no se guarda nada. 409 también si la propuesta ya no está
+    pendiente. No lanza ningún recálculo histórico.
     """
     proposal = _pending_for_update(session, user_id, proposal_id)
-    base = thresholds.threshold_on(session, user_id, proposal.test_date)
-    threshold = thresholds.add_threshold(session, user_id, threshold_values(proposal, base))
+    plan = _plan(session, user_id, proposal, lock=True)
+    preview = plan.preview
+    if (preview.action, preview.previous_ftp_w) != (action, previous_ftp_w):
+        session.rollback()
+        raise ConflictError(
+            "Los umbrales han cambiado desde la vista previa: revisa la nueva antes de aceptar.",
+            code="preview_outdated",
+            details=preview,
+        )
+    if plan.row_on_date is None:
+        threshold = thresholds.add_threshold(
+            session, user_id, threshold_values(proposal, plan.base)
+        )
+    else:
+        threshold = thresholds.update_ftp(
+            session, user_id, plan.row_on_date, proposal.proposed_ftp_w, proposal.id
+        )
     proposal.status = ProposalStatus.ACCEPTED
     proposal.decided_at = sa.func.now()
     proposal.threshold_id = threshold.id
