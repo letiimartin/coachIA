@@ -1,0 +1,85 @@
+"""FTP de umbral desde un test (#45): `ftp_proposal_id` e historial de la aceptación.
+
+- `athlete_thresholds.ftp_proposal_id`: propuesta de test de la que sale el `ftp_w` de la fila,
+  tanto si aceptarla creó la fila como si sólo actualizó su FTP. FK a `threshold_proposals` con
+  ON DELETE SET NULL.
+- `threshold_proposals.accepted_action` (`create_row` / `update_ftp`, texto con CHECK) y
+  `previous_ftp_w`: qué hizo la aceptación y el FTP de `test_date` justo antes. Sólo
+  historial. CHECK: `accepted_action` está si y sólo si la propuesta está aceptada; exige que no
+  haya propuestas aceptadas antes de esta migración, que es lo que ocurre porque 659dc8e0123e
+  (que crea la tabla) no se ha aplicado en ningún entorno compartido.
+
+Columnas nullable sin valor por defecto (sólo cambian el catálogo, no reescriben las tablas).
+No toca ningún dato, ningún umbral ni ninguna carga. RLS y privilegios no cambian.
+
+Revision ID: 73d50e89ab8e
+Revises: 659dc8e0123e
+Create Date: 2026-11-18 21:56:17.236969+00:00
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+
+from alembic import op
+
+revision: str = "73d50e89ab8e"
+down_revision: str | None = "659dc8e0123e"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    op.add_column("athlete_thresholds", sa.Column("ftp_proposal_id", sa.UUID(), nullable=True))
+    op.create_foreign_key(
+        op.f("fk_athlete_thresholds_ftp_proposal_id_threshold_proposals"),
+        "athlete_thresholds",
+        "threshold_proposals",
+        ["ftp_proposal_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+    op.add_column(
+        "threshold_proposals",
+        sa.Column(
+            "accepted_action",
+            sa.Enum(
+                "create_row",
+                "update_ftp",
+                name="accept_action",
+                native_enum=False,
+                create_constraint=True,
+                length=32,
+            ),
+            nullable=True,
+        ),
+    )
+    op.add_column("threshold_proposals", sa.Column("previous_ftp_w", sa.Integer(), nullable=True))
+    op.create_check_constraint(
+        op.f("ck_threshold_proposals_accepted_history"),
+        "threshold_proposals",
+        "(status = 'accepted') = (accepted_action IS NOT NULL)",
+    )
+    op.create_check_constraint(
+        op.f("ck_threshold_proposals_previous_ftp"),
+        "threshold_proposals",
+        "previous_ftp_w IS NULL OR status = 'accepted'",
+    )
+
+
+def downgrade() -> None:
+    op.drop_constraint(
+        op.f("ck_threshold_proposals_previous_ftp"), "threshold_proposals", type_="check"
+    )
+    op.drop_constraint(
+        op.f("ck_threshold_proposals_accepted_history"), "threshold_proposals", type_="check"
+    )
+    op.drop_column("threshold_proposals", "previous_ftp_w")
+    # Quita también el CHECK del enum (ck_threshold_proposals_accept_action).
+    op.drop_column("threshold_proposals", "accepted_action")
+    op.drop_constraint(
+        op.f("fk_athlete_thresholds_ftp_proposal_id_threshold_proposals"),
+        "athlete_thresholds",
+        type_="foreignkey",
+    )
+    op.drop_column("athlete_thresholds", "ftp_proposal_id")

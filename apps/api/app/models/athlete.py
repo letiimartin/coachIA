@@ -86,6 +86,13 @@ class AthleteThreshold(TimestampMixin, Base):
         str_enum(ThresholdSource, "threshold_source"), server_default=ThresholdSource.MANUAL.value
     )
     notes: Mapped[str | None] = mapped_column(sa.Text)
+    # Propuesta de test de la que sale el `ftp_w` de esta fila (#45), sea porque la creó o
+    # porque sólo actualizó su FTP. SET NULL: borrar la propuesta no borra el umbral.
+    # `use_alter`: las dos tablas se referencian entre sí.
+    ftp_proposal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("threshold_proposals.id", ondelete="SET NULL", use_alter=True),
+    )
 
     __table_args__ = (
         sa.UniqueConstraint("user_id", "effective_from"),

@@ -75,6 +75,29 @@ def add_threshold(session: Session, user_id: uuid.UUID, values: dict[str, Any]) 
     return threshold
 
 
+def update_ftp(
+    session: Session,
+    user_id: uuid.UUID,
+    threshold: AthleteThreshold,
+    ftp_w: int,
+    proposal_id: uuid.UUID,
+) -> AthleteThreshold:
+    """Cambia sólo el `ftp_w` de una fila existente (con el de un test aceptado) sin commit.
+
+    Conserva el resto de valores de la fila, incluido `source`, y registra la propuesta de la
+    que sale el FTP (`ftp_proposal_id`). No toca los registros posteriores. Como
+    `add_threshold`, sólo corre el gancho normal: regenera la forma desde `effective_from` y
+    calcula la carga de las actividades que no la tienen, sin cambiar las existentes (#22).
+    """
+    if threshold.user_id != user_id:  # pragma: no cover - el llamador ya filtra por atleta.
+        raise NotFoundError("Umbral no encontrado.")
+    threshold.ftp_w = ftp_w
+    threshold.ftp_proposal_id = proposal_id
+    session.flush()
+    fitness.recompute_from(session, user_id, threshold.effective_from)
+    return threshold
+
+
 def threshold_on(session: Session, user_id: uuid.UUID, on: date) -> AthleteThreshold | None:
     """Fila más reciente con `effective_from <= on`, o None si no hay ninguna."""
     return session.scalar(

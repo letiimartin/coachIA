@@ -197,9 +197,10 @@ export interface paths {
          * @description Descarga el FIT de la actividad, detecta el test y crea una propuesta **pendiente**.
          *
          *     No cambia ningún umbral. Errores 422 con `code`: `not_cycling`, `fit_unavailable` (sin
-         *     fichero), `fit_invalid` (dañado o sin registros), `no_power_data`, `test_too_short`,
-         *     `insufficient_data` (demasiados huecos) y `ftp_out_of_range`. 409 si ya hay una propuesta
-         *     pendiente de esa actividad.
+         *     fichero), `fit_invalid` (dañado o sin registros), y los criterios que bloquean la
+         *     propuesta, con el criterio evaluado (valor medido, umbral, mensaje) en `error.details`:
+         *     `no_power_data`, `test_too_short`, `insufficient_data` (demasiados huecos) y
+         *     `ftp_out_of_range`. 409 si ya hay una propuesta pendiente de esa actividad.
          */
         post: operations["create_proposal_v1_athlete_threshold_proposals_post"];
         delete?: never;
@@ -236,14 +237,44 @@ export interface paths {
         put?: never;
         /**
          * Accept Proposal
-         * @description Acepta la propuesta: crea un umbral nuevo vigente desde `test_date` con `source = test`.
+         * @description Acepta la propuesta tal como la mostró la vista previa (`action` y `previous_ftp_w`).
          *
-         *     El umbral nuevo lleva el FTP propuesto y copia el resto de valores del umbral vigente ese
-         *     día. No fuerza ningún recálculo histórico: sólo se rellena la carga de las actividades que
-         *     no la tienen y se regenera la forma. 409 si la propuesta no está pendiente o si ya hay
-         *     umbrales registrados en `test_date`.
+         *     - `create_row`: crea un umbral vigente desde `test_date` con `source = test`, el FTP
+         *       propuesto y el resto de valores copiados del umbral vigente ese día.
+         *     - `update_ftp`: cambia sólo el `ftp_w` de la fila de `test_date`; conserva el resto.
+         *
+         *     La fila guarda la propuesta de la que sale su FTP; los registros posteriores no se tocan.
+         *     No lanza ningún recálculo histórico: sólo se rellena la carga de las actividades que no la
+         *     tienen y se regenera la forma. 409 `preview_outdated` (con la vista previa nueva en
+         *     `error.details`) si la acción o el FTP anterior ya no coinciden; 409 `conflict` si la
+         *     propuesta no está pendiente.
          */
         post: operations["accept_proposal_v1_athlete_threshold_proposals__proposal_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/athlete/threshold-proposals/{proposal_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Acceptance
+         * @description Vista previa de aceptar la propuesta, sin guardar nada.
+         *
+         *     `action`: `create_row` (no hay umbrales en `test_date`) o `update_ftp` (ya hay una fila en
+         *     esa fecha; sólo cambiaría su FTP). Incluye el FTP anterior de esa fecha, el propuesto y la
+         *     ventana de vigencia del FTP nuevo; si hay registros posteriores, el aviso
+         *     `later_thresholds` y el siguiente registro. 409 si la propuesta no está pendiente.
+         */
+        get: operations["preview_acceptance_v1_athlete_threshold_proposals__proposal_id__preview_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -264,6 +295,30 @@ export interface paths {
          * @description Rechaza la propuesta. No cambia ningún umbral. 409 si no está pendiente.
          */
         post: operations["reject_proposal_v1_athlete_threshold_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/athlete/threshold-proposals/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry Run
+         * @description Análisis de prueba: descarga el FIT y analiza el test **sin crear ninguna propuesta**.
+         *
+         *     Devuelve el intervalo detectado, sus métricas, el FTP propuesto y la evaluación de cada
+         *     criterio de calidad. Sirve para validar la descarga y la lectura del FIT. Mismos errores
+         *     que crear la propuesta, salvo el 409 (no se crea nada).
+         */
+        post: operations["dry_run_v1_athlete_threshold_proposals_dry_run_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -472,6 +527,78 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AcceptAction
+         * @description Qué hace aceptar una propuesta (#45). No se guarda: se calcula en la vista previa.
+         * @enum {string}
+         */
+        AcceptAction: "create_row" | "update_ftp";
+        /**
+         * AcceptancePreviewOut
+         * @description Qué cambiaría al aceptar la propuesta. No guarda nada.
+         *
+         *     - `create_row`: no hay umbrales en `test_date`; se crearía una fila con `source = test`,
+         *       el FTP propuesto y el resto de valores copiados del umbral vigente ese día.
+         *     - `update_ftp`: ya hay una fila en `test_date` (`threshold_id`); sólo cambiaría su
+         *       `ftp_w`, el resto de valores se conservan.
+         *
+         *     El FTP nuevo regiría desde `effective_from` (= `test_date`) hasta `effective_until`
+         *     (el día anterior al siguiente registro, `next_threshold`), o sin fin si es null. Los
+         *     registros posteriores no se tocan nunca.
+         * @example {
+         *       "action": "update_ftp",
+         *       "effective_from": "2026-11-15",
+         *       "effective_until": "2026-11-30",
+         *       "next_threshold": {
+         *         "effective_from": "2026-12-01",
+         *         "ftp_w": 235,
+         *         "id": "6e3d2c1b-0a9f-4b8c-9d7e-6f5a4b3c2d1e"
+         *       },
+         *       "previous_ftp_w": 220,
+         *       "proposal_id": "3f6c1d2e-8a4b-4c7d-9e1f-2a3b4c5d6e7f",
+         *       "proposed_ftp_w": 230,
+         *       "threshold_id": "5d2c1b0a-9e8f-4a7b-8c6d-5e4f3a2b1c0d",
+         *       "warnings": [
+         *         {
+         *           "code": "later_thresholds",
+         *           "message": "Hay umbrales registrados desde el 2026-12-01: el FTP nuevo sólo regirá hasta el 2026-11-30 y después seguirá vigente el de ese registro (235 W)."
+         *         }
+         *       ]
+         *     }
+         */
+        AcceptancePreviewOut: {
+            action: components["schemas"]["AcceptAction"];
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * Effective Until
+             * @description Último día de vigencia; null = sin fin.
+             */
+            effective_until: string | null;
+            next_threshold: components["schemas"]["NextThresholdOut"] | null;
+            /**
+             * Previous Ftp W
+             * @description FTP de `test_date` antes de aceptar: el de la fila de esa fecha (`update_ftp`) o el vigente ese día (`create_row`). Null si no había.
+             */
+            previous_ftp_w: number | null;
+            /**
+             * Proposal Id
+             * Format: uuid
+             */
+            proposal_id: string;
+            /** Proposed Ftp W */
+            proposed_ftp_w: number;
+            /**
+             * Threshold Id
+             * @description Fila que se actualizaría (`update_ftp`).
+             */
+            threshold_id: string | null;
+            /** Warnings */
+            warnings: components["schemas"]["PreviewWarningOut"][];
+        };
         /** AuthorizeUrlOut */
         AuthorizeUrlOut: {
             /** Authorize Url */
@@ -653,6 +780,12 @@ export interface components {
             title?: string | null;
             training_impact?: components["schemas"]["TrainingImpact"] | null;
         };
+        /**
+         * Comparison
+         * @description Condición que cumple el valor medido frente al umbral cuando el criterio se cumple.
+         * @enum {string}
+         */
+        Comparison: "gt" | "ge" | "lt" | "le";
         /**
          * CurrentThresholdOut
          * @description Umbral vigente en la fecha `on` (la fila más reciente con `effective_from <= on`).
@@ -1089,6 +1222,27 @@ export interface components {
              */
             id: string;
         };
+        /**
+         * NextThresholdOut
+         * @description Siguiente registro de umbrales después de `test_date`. No se toca al aceptar.
+         */
+        NextThresholdOut: {
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * Ftp W
+             * @description FTP que seguirá vigente desde `effective_from`.
+             */
+            ftp_w: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** PingResponse */
         PingResponse: {
             /**
@@ -1102,6 +1256,18 @@ export interface components {
          * @enum {string}
          */
         PreferredTime: "morning" | "midday" | "afternoon" | "evening" | "any";
+        /**
+         * PreviewWarningCode
+         * @enum {string}
+         */
+        PreviewWarningCode: "later_thresholds";
+        /** PreviewWarningOut */
+        PreviewWarningOut: {
+            /** @description `later_thresholds`: hay umbrales registrados después de `test_date`; el FTP nuevo sólo rige hasta `effective_until`. */
+            code: components["schemas"]["PreviewWarningCode"];
+            /** Message */
+            message: string;
+        };
         /**
          * ProfileOut
          * @description Perfil del atleta autenticado. Se crea automáticamente la primera vez que se pide.
@@ -1237,20 +1403,52 @@ export interface components {
          */
         Provider: "wahoo" | "strava" | "suunto" | "garmin";
         /**
-         * QualityWarningCode
+         * QualityCheckOut
+         * @description Evaluación de un criterio de calidad del test.
+         *
+         *     El criterio se cumple (`passed`) si `measured <comparison> threshold`. Si no se cumple y
+         *     es `blocking`, no se puede proponer el umbral (error 422 con este mismo objeto en
+         *     `error.details`); si no es `blocking`, sólo avisa.
+         */
+        QualityCheckOut: {
+            /**
+             * Blocking
+             * @description Si no se cumple, impide la propuesta (si no, avisa).
+             */
+            blocking: boolean;
+            /** @description Bloquean: `test_too_short` (duración de la actividad), `no_power_data` (potencia media del bloque), `insufficient_data` (% de datos válidos del bloque). Avisan: `data_gaps` (hueco sin potencia más largo del bloque), `pauses` (tramo a 0 W más largo del bloque), `high_variability` (NP / potencia media), `no_warmup` (segundos antes del bloque). */
+            code: components["schemas"]["QualityCriterion"];
+            /** @description Condición para cumplirlo: `measured` gt/ge/lt/le `threshold`. */
+            comparison: components["schemas"]["Comparison"];
+            /**
+             * Measured
+             * @description Valor medido.
+             */
+            measured: number;
+            /**
+             * Message
+             * @description Explicación legible.
+             */
+            message: string;
+            /** Passed */
+            passed: boolean;
+            /**
+             * Threshold
+             * @description Umbral del criterio.
+             */
+            threshold: number;
+            /**
+             * Unit
+             * @description `s`, `W`, `%` o vacío (adimensional).
+             */
+            unit: string;
+        };
+        /**
+         * QualityCriterion
+         * @description Criterios de calidad del test. Los tres primeros bloquean la propuesta.
          * @enum {string}
          */
-        QualityWarningCode: "data_gaps" | "pauses" | "high_variability" | "no_warmup";
-        /**
-         * QualityWarningOut
-         * @description Aviso de calidad del test. No impide aceptar la propuesta.
-         */
-        QualityWarningOut: {
-            /** @description `data_gaps`: faltan datos dentro del bloque; `pauses`: tramos a 0 W dentro del bloque; `high_variability`: esfuerzo poco constante; `no_warmup`: sin calentamiento previo suficiente. */
-            code: components["schemas"]["QualityWarningCode"];
-            /** Message */
-            message: string;
-        };
+        QualityCriterion: "test_too_short" | "no_power_data" | "insufficient_data" | "data_gaps" | "pauses" | "high_variability" | "no_warmup";
         /**
          * RaceCreate
          * @description Datos de la carrera. Todos opcionales: se pueden completar más tarde.
@@ -1480,6 +1678,11 @@ export interface components {
              * Format: date
              */
             effective_from: string;
+            /**
+             * Ftp Proposal Id
+             * @description Propuesta de test de la que sale `ftp_w`, si se aceptó una. Puede ir con `source = manual` si el test sólo actualizó el FTP de una fila existente.
+             */
+            readonly ftp_proposal_id: string | null;
             /** Ftp W */
             ftp_w: number | null;
             /** Hr Max Bpm */
@@ -1514,6 +1717,22 @@ export interface components {
             weight_kg: number | null;
         };
         /**
+         * ThresholdProposalAccept
+         * @description Confirma lo que mostró la vista previa. Si ya no coincide, 409 con la vista nueva.
+         * @example {
+         *       "action": "update_ftp",
+         *       "previous_ftp_w": 220
+         *     }
+         */
+        ThresholdProposalAccept: {
+            action: components["schemas"]["AcceptAction"];
+            /**
+             * Previous Ftp W
+             * @description `previous_ftp_w` de la vista previa (null si no había FTP).
+             */
+            previous_ftp_w: number | null;
+        };
+        /**
          * ThresholdProposalCreate
          * @description Analiza el test hecho en una actividad de ciclismo y crea una propuesta pendiente.
          * @example {
@@ -1535,9 +1754,10 @@ export interface components {
          * @description Propuesta de umbral salida de un test. Es sólo una propuesta hasta que se acepta.
          *
          *     - `pending`: no cambia ningún umbral.
-         *     - `accepted`: se creó un umbral nuevo (`threshold_id`) vigente desde `test_date`, con
-         *       `source = test`, el FTP propuesto y el resto de valores copiados del umbral vigente ese
-         *       día.
+         *     - `accepted`: `threshold_id` es el umbral con el FTP del test. Si no había umbrales en
+         *       `test_date`, una fila nueva con `source = test` y el resto de valores copiados del umbral
+         *       vigente ese día; si ya había una fila en esa fecha, la misma fila con sólo `ftp_w`
+         *       cambiado.
          *     - `rejected`: no se tocó nada.
          * @example {
          *       "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
@@ -1562,10 +1782,23 @@ export interface components {
          *       "status": "pending",
          *       "test_date": "2026-11-15",
          *       "updated_at": "2026-11-15T10:00:00Z",
-         *       "warnings": []
+         *       "warnings": [
+         *         {
+         *           "blocking": false,
+         *           "code": "no_warmup",
+         *           "comparison": "ge",
+         *           "measured": 300,
+         *           "message": "El bloque empieza a los 5 min: no hay un calentamiento previo de al menos 10 min.",
+         *           "passed": false,
+         *           "threshold": 600,
+         *           "unit": "s"
+         *         }
+         *       ]
          *     }
          */
         ThresholdProposalOut: {
+            /** @description Historial: qué hizo la aceptación (null si no está aceptada). */
+            accepted_action: components["schemas"]["AcceptAction"] | null;
             /**
              * Activity Id
              * Format: uuid
@@ -1595,6 +1828,11 @@ export interface components {
             interval_start_at: string;
             metrics: components["schemas"]["ProposalMetricsOut"];
             /**
+             * Previous Ftp W
+             * @description Historial: FTP de `test_date` justo antes de aceptar (el de la fila con `update_ftp`, el vigente ese día con `create_row`). Null si no había o si la propuesta no está aceptada.
+             */
+            previous_ftp_w: number | null;
+            /**
              * Proposed Ftp W
              * @description FTP propuesto: 95 % de la potencia media del bloque.
              */
@@ -1609,7 +1847,7 @@ export interface components {
             test_date: string;
             /**
              * Threshold Id
-             * @description Umbral creado al aceptar la propuesta.
+             * @description Umbral creado o actualizado al aceptar la propuesta.
              */
             threshold_id: string | null;
             /**
@@ -1617,8 +1855,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
-            /** Warnings */
-            warnings: components["schemas"]["QualityWarningOut"][];
+            /**
+             * Warnings
+             * @description Criterios que no bloquean y no se cumplen (avisos).
+             */
+            warnings: components["schemas"]["QualityCheckOut"][];
         };
         /**
          * ThresholdProtocol
@@ -1630,6 +1871,44 @@ export interface components {
          * @enum {string}
          */
         ThresholdSource: "manual" | "test" | "estimated";
+        /**
+         * ThresholdTestAnalysisOut
+         * @description Análisis de prueba (`dry-run`): lo que saldría del test, **sin crear ninguna propuesta**.
+         *
+         *     `checks` tiene todos los criterios de calidad evaluados; `warnings`, los que avisan y no se
+         *     cumplen (los mismos que tendría la propuesta).
+         */
+        ThresholdTestAnalysisOut: {
+            /**
+             * Activity Id
+             * Format: uuid
+             */
+            activity_id: string;
+            /** Checks */
+            checks: components["schemas"]["QualityCheckOut"][];
+            /**
+             * Interval End At
+             * Format: date-time
+             */
+            interval_end_at: string;
+            /**
+             * Interval Start At
+             * Format: date-time
+             */
+            interval_start_at: string;
+            metrics: components["schemas"]["ProposalMetricsOut"];
+            /** Proposed Ftp W */
+            proposed_ftp_w: number;
+            protocol: components["schemas"]["ThresholdProtocol"];
+            /**
+             * Test Date
+             * Format: date
+             * @description Día local de la actividad.
+             */
+            test_date: string;
+            /** Warnings */
+            warnings: components["schemas"]["QualityCheckOut"][];
+        };
         /**
          * TrainingImpact
          * @description Cómo debe tratar el coach el evento al planificar.
@@ -2384,7 +2663,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThresholdProposalAccept"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2393,6 +2676,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ThresholdProposalOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicto con el estado actual. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_acceptance_v1_athlete_threshold_proposals__proposal_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptancePreviewOut"];
                 };
             };
             /** @description Falta el JWT o no es válido. */
@@ -2500,6 +2850,93 @@ export interface operations {
             };
             /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    dry_run_v1_athlete_threshold_proposals_dry_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThresholdProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThresholdTestAnalysisOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Datos no válidos o que no permiten completar la operación. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Límite de peticiones de un servicio externo. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Un servicio externo no ha respondido correctamente. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Servicio no configurado. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

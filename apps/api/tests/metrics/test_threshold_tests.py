@@ -5,11 +5,14 @@ import pytest
 from app.metrics.tests import (
     FTP_20MIN_DURATION_S,
     ActivityTooShortError,
+    Comparison,
     InsufficientDataError,
     NoPowerDataError,
-    QualityWarningCode,
+    QualityCheck,
+    QualityCriterion,
     Sample,
     ThresholdProtocol,
+    ThresholdTestError,
     analyze_ftp_20min,
     normalized_power,
 )
@@ -26,8 +29,8 @@ def _series(*blocks: tuple[int, float | None], hr: float | None = 150.0) -> list
     return samples
 
 
-def _codes(samples: list[Sample]) -> set[QualityWarningCode]:
-    return {warning.code for warning in analyze_ftp_20min(samples).warnings}
+def _codes(samples: list[Sample]) -> set[QualityCriterion]:
+    return {warning.criterion for warning in analyze_ftp_20min(samples).warnings}
 
 
 def test_clean_test_detects_the_block_and_proposes_95_percent() -> None:
@@ -84,33 +87,33 @@ def test_long_gap_inside_the_block_is_not_interpolated_and_warns() -> None:
     result = analyze_ftp_20min(samples)
     assert result.avg_power_w < 250
     assert result.valid_data_pct < 100
-    assert QualityWarningCode.DATA_GAPS in {w.code for w in result.warnings}
+    assert QualityCriterion.DATA_GAPS in {w.criterion for w in result.warnings}
 
 
 def test_zero_power_pause_inside_the_block_warns() -> None:
     samples = _series((900, 150), (500, 260), (30, 0), (670, 260), (300, 100))
     codes = _codes(samples)
-    assert QualityWarningCode.PAUSES in codes
-    assert QualityWarningCode.DATA_GAPS not in codes
+    assert QualityCriterion.PAUSES in codes
+    assert QualityCriterion.DATA_GAPS not in codes
 
 
 def test_short_zero_power_stretch_does_not_warn_as_pause() -> None:
     samples = _series((900, 150), (600, 250), (5, 0), (595, 250), (300, 100))
-    assert QualityWarningCode.PAUSES not in _codes(samples)
+    assert QualityCriterion.PAUSES not in _codes(samples)
 
 
 def test_high_variability_warns() -> None:
     blocks: list[tuple[int, float | None]] = [(900, 150)]
     blocks += [(60, 400), (60, 100)] * 10
     blocks += [(300, 100)]
-    assert QualityWarningCode.HIGH_VARIABILITY in _codes(_series(*blocks))
+    assert QualityCriterion.HIGH_VARIABILITY in _codes(_series(*blocks))
 
 
 def test_test_without_warmup_warns() -> None:
     samples = _series((1200, 250), (900, 120))
     result = analyze_ftp_20min(samples)
     assert result.start_offset_s == 0
-    assert {w.code for w in result.warnings} == {QualityWarningCode.NO_WARMUP}
+    assert {w.criterion for w in result.warnings} == {QualityCriterion.NO_WARMUP}
 
 
 def test_offsets_start_at_the_first_sample() -> None:
@@ -149,3 +152,137 @@ def test_normalized_power_of_constant_series_is_the_value() -> None:
     assert normalized_power([200.0] * 120) == pytest.approx(200)
     assert normalized_power([100.0, 300.0]) == pytest.approx(200)
     assert normalized_power([150.0] * 60 + [350.0] * 60) > 250
+
+
+# --- Criterios de calidad explicados (#45) ------------------------------------------------------
+
+
+def _check(samples: list[Sample], criterion: QualityCriterion) -> QualityCheck:
+    [check] = [c for c in analyze_ftp_20min(samples).checks if c.criterion is criterion]
+    return check
+
+
+def test_clean_test_evaluates_every_criterion_and_passes_them_all() -> None:
+    result = analyze_ftp_20min(_series((900, 150), (1200, 250), (600, 120)))
+    assert [c.criterion for c in result.checks] == list(QualityCriterion)
+    assert all(c.passed for c in result.checks)
+    blocking = {c.criterion for c in result.checks if c.blocking}
+    assert blocking == {
+        QualityCriterion.TEST_TOO_SHORT,
+        QualityCriterion.NO_POWER_DATA,
+        QualityCriterion.INSUFFICIENT_DATA,
+    }
+    by_code = {c.criterion: c for c in result.checks}
+    duration = by_code[QualityCriterion.TEST_TOO_SHORT]
+    assert (duration.measured, duration.threshold, duration.comparison) == (2700, 1200, "ge")
+    assert by_code[QualityCriterion.NO_POWER_DATA].measured == 250
+    assert by_code[QualityCriterion.INSUFFICIENT_DATA].measured == 100
+    assert by_code[QualityCriterion.HIGH_VARIABILITY].measured == 1.0
+    assert result.warnings == ()
+
+
+@pytest.mark.parametrize(
+    ("samples", "criterion", "measured", "threshold", "comparison", "unit"),
+    [
+        # Hueco de 60 s sin registro (se toleran 3 s).
+        (
+            [
+                s
+                for s in _series((900, 150), (1200, 250), (300, 100))
+                if not 1500 <= s.offset_s < 1560
+            ],
+            QualityCriterion.DATA_GAPS,
+            60,
+            3,
+            Comparison.LE,
+            "s",
+        ),
+        # Pausa de 30 s a 0 W (avisa desde 10 s).
+        (
+            _series((900, 150), (500, 260), (30, 0), (670, 260), (300, 100)),
+            QualityCriterion.PAUSES,
+            30,
+            10,
+            Comparison.LT,
+            "s",
+        ),
+        # Calentamiento de 5 min (mínimo 10).
+        (
+            _series((300, 150), (1200, 250), (600, 100)),
+            QualityCriterion.NO_WARMUP,
+            300,
+            600,
+            Comparison.GE,
+            "s",
+        ),
+    ],
+)
+def test_warning_explains_criterion_value_and_threshold(
+    samples: list[Sample],
+    criterion: QualityCriterion,
+    measured: float,
+    threshold: float,
+    comparison: Comparison,
+    unit: str,
+) -> None:
+    check = _check(samples, criterion)
+    assert not check.passed
+    assert not check.blocking
+    assert (check.measured, check.threshold, check.comparison, check.unit) == (
+        measured,
+        threshold,
+        comparison,
+        unit,
+    )
+    assert check.message
+    assert check in analyze_ftp_20min(samples).warnings
+
+
+def test_high_variability_check_reports_the_index() -> None:
+    blocks: list[tuple[int, float | None]] = [(900, 150)]
+    blocks += [(60, 400), (60, 100)] * 10
+    blocks += [(300, 100)]
+    check = _check(_series(*blocks), QualityCriterion.HIGH_VARIABILITY)
+    assert not check.passed and not check.blocking
+    assert check.measured > 1.05 and check.threshold == 1.05
+    assert check.comparison is Comparison.LE
+    assert f"{check.measured:.3f}" in check.message
+
+
+def test_gap_of_three_seconds_is_tolerated_but_four_warns() -> None:
+    base = _series((900, 150), (1200, 250), (300, 100))
+    tolerated = [s for s in base if not 1200 <= s.offset_s < 1203]
+    assert _check(tolerated, QualityCriterion.DATA_GAPS).passed
+    warned = [s for s in base if not 1200 <= s.offset_s < 1204]
+    check = _check(warned, QualityCriterion.DATA_GAPS)
+    assert not check.passed and check.measured == 4
+
+
+def test_pause_of_nine_seconds_passes_and_ten_warns() -> None:
+    def pause(seconds: int) -> list[Sample]:
+        return _series((900, 150), (600, 250), (seconds, 0), (600 - seconds, 250), (300, 100))
+
+    assert _check(pause(9), QualityCriterion.PAUSES).passed
+    assert not _check(pause(10), QualityCriterion.PAUSES).passed
+
+
+@pytest.mark.parametrize(
+    ("samples", "code", "measured", "threshold", "unit"),
+    [
+        (_series((600, 250)), "test_too_short", 600, 1200, "s"),
+        ([], "test_too_short", 0, 1200, "s"),
+        (_series((3000, None)), "no_power_data", 0, 0, "W"),
+        (_series((3000, 0)), "no_power_data", 0, 0, "W"),
+        (_series((500, 300), (2500, None)), "insufficient_data", 41.7, 50, "%"),
+    ],
+)
+def test_blocking_errors_carry_the_failed_criterion(
+    samples: list[Sample], code: str, measured: float, threshold: float, unit: str
+) -> None:
+    with pytest.raises(ThresholdTestError) as error:
+        analyze_ftp_20min(samples)
+    check = error.value.check
+    assert error.value.code == code == check.criterion
+    assert check.blocking and not check.passed
+    assert (check.measured, check.threshold, check.unit) == (measured, threshold, unit)
+    assert error.value.message == check.message

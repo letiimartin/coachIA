@@ -1,4 +1,4 @@
-"""Schemas de las propuestas de umbral salidas de un test (#42)."""
+"""Schemas de las propuestas de umbral salidas de un test (#42, #45)."""
 
 from datetime import date, datetime
 from typing import Any
@@ -6,8 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.metrics.tests import QualityWarningCode, ThresholdProtocol
-from app.models.threshold_proposal import ProposalStatus
+from app.metrics.tests import Comparison, QualityCriterion, ThresholdProtocol
+from app.models.threshold_proposal import AcceptAction, PreviewWarningCode, ProposalStatus
 
 _PROPOSAL_EXAMPLE: dict[str, Any] = {
     "id": "3f6c1d2e-8a4b-4c7d-9e1f-2a3b4c5d6e7f",
@@ -30,9 +30,23 @@ _PROPOSAL_EXAMPLE: dict[str, Any] = {
         "warmup_s": 900,
     },
     "proposed_ftp_w": 230,
-    "warnings": [],
+    "warnings": [
+        {
+            "code": "no_warmup",
+            "passed": False,
+            "blocking": False,
+            "measured": 300,
+            "threshold": 600,
+            "comparison": "ge",
+            "unit": "s",
+            "message": "El bloque empieza a los 5 min: no hay un calentamiento previo de al menos"
+            " 10 min.",
+        }
+    ],
     "decided_at": None,
     "threshold_id": None,
+    "accepted_action": None,
+    "previous_ftp_w": None,
     "created_at": "2026-11-15T10:00:00Z",
     "updated_at": "2026-11-15T10:00:00Z",
 }
@@ -71,26 +85,44 @@ class ProposalMetricsOut(BaseModel):
     warmup_s: int = Field(description="Segundos registrados antes del bloque.")
 
 
-class QualityWarningOut(BaseModel):
-    """Aviso de calidad del test. No impide aceptar la propuesta."""
+class QualityCheckOut(BaseModel):
+    """Evaluación de un criterio de calidad del test.
 
-    code: QualityWarningCode = Field(
+    El criterio se cumple (`passed`) si `measured <comparison> threshold`. Si no se cumple y
+    es `blocking`, no se puede proponer el umbral (error 422 con este mismo objeto en
+    `error.details`); si no es `blocking`, sólo avisa.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: QualityCriterion = Field(
         description=(
-            "`data_gaps`: faltan datos dentro del bloque; `pauses`: tramos a 0 W dentro del"
-            " bloque; `high_variability`: esfuerzo poco constante; `no_warmup`: sin"
-            " calentamiento previo suficiente."
+            "Bloquean: `test_too_short` (duración de la actividad), `no_power_data` (potencia"
+            " media del bloque), `insufficient_data` (% de datos válidos del bloque). Avisan:"
+            " `data_gaps` (hueco sin potencia más largo del bloque), `pauses` (tramo a 0 W más"
+            " largo del bloque), `high_variability` (NP / potencia media), `no_warmup`"
+            " (segundos antes del bloque)."
         )
     )
-    message: str
+    passed: bool
+    blocking: bool = Field(description="Si no se cumple, impide la propuesta (si no, avisa).")
+    measured: float = Field(description="Valor medido.")
+    threshold: float = Field(description="Umbral del criterio.")
+    comparison: Comparison = Field(
+        description="Condición para cumplirlo: `measured` gt/ge/lt/le `threshold`."
+    )
+    unit: str = Field(description="`s`, `W`, `%` o vacío (adimensional).")
+    message: str = Field(description="Explicación legible.")
 
 
 class ThresholdProposalOut(BaseModel):
     """Propuesta de umbral salida de un test. Es sólo una propuesta hasta que se acepta.
 
     - `pending`: no cambia ningún umbral.
-    - `accepted`: se creó un umbral nuevo (`threshold_id`) vigente desde `test_date`, con
-      `source = test`, el FTP propuesto y el resto de valores copiados del umbral vigente ese
-      día.
+    - `accepted`: `threshold_id` es el umbral con el FTP del test. Si no había umbrales en
+      `test_date`, una fila nueva con `source = test` y el resto de valores copiados del umbral
+      vigente ese día; si ya había una fila en esa fecha, la misma fila con sólo `ftp_w`
+      cambiado.
     - `rejected`: no se tocó nada.
     """
 
@@ -109,8 +141,132 @@ class ThresholdProposalOut(BaseModel):
     interval_end_at: datetime
     metrics: ProposalMetricsOut
     proposed_ftp_w: int = Field(description="FTP propuesto: 95 % de la potencia media del bloque.")
-    warnings: list[QualityWarningOut]
+    warnings: list[QualityCheckOut] = Field(
+        description="Criterios que no bloquean y no se cumplen (avisos)."
+    )
     decided_at: datetime | None
-    threshold_id: UUID | None = Field(description="Umbral creado al aceptar la propuesta.")
+    threshold_id: UUID | None = Field(
+        description="Umbral creado o actualizado al aceptar la propuesta."
+    )
+    accepted_action: AcceptAction | None = Field(
+        description="Historial: qué hizo la aceptación (null si no está aceptada)."
+    )
+    previous_ftp_w: int | None = Field(
+        description=(
+            "Historial: FTP de `test_date` justo antes de aceptar (el de la fila con"
+            " `update_ftp`, el vigente ese día con `create_row`). Null si no había o si la"
+            " propuesta no está aceptada."
+        )
+    )
     created_at: datetime
     updated_at: datetime
+
+
+class ThresholdTestAnalysisOut(BaseModel):
+    """Análisis de prueba (`dry-run`): lo que saldría del test, **sin crear ninguna propuesta**.
+
+    `checks` tiene todos los criterios de calidad evaluados; `warnings`, los que avisan y no se
+    cumplen (los mismos que tendría la propuesta).
+    """
+
+    activity_id: UUID
+    protocol: ThresholdProtocol
+    test_date: date = Field(description="Día local de la actividad.")
+    interval_start_at: datetime
+    interval_end_at: datetime
+    metrics: ProposalMetricsOut
+    proposed_ftp_w: int
+    checks: list[QualityCheckOut]
+    warnings: list[QualityCheckOut]
+
+
+class NextThresholdOut(BaseModel):
+    """Siguiente registro de umbrales después de `test_date`. No se toca al aceptar."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    effective_from: date
+    ftp_w: int | None = Field(description="FTP que seguirá vigente desde `effective_from`.")
+
+
+class PreviewWarningOut(BaseModel):
+    code: PreviewWarningCode = Field(
+        description=(
+            "`later_thresholds`: hay umbrales registrados después de `test_date`; el FTP"
+            " nuevo sólo rige hasta `effective_until`."
+        )
+    )
+    message: str
+
+
+class AcceptancePreviewOut(BaseModel):
+    """Qué cambiaría al aceptar la propuesta. No guarda nada.
+
+    - `create_row`: no hay umbrales en `test_date`; se crearía una fila con `source = test`,
+      el FTP propuesto y el resto de valores copiados del umbral vigente ese día.
+    - `update_ftp`: ya hay una fila en `test_date` (`threshold_id`); sólo cambiaría su
+      `ftp_w`, el resto de valores se conservan.
+
+    El FTP nuevo regiría desde `effective_from` (= `test_date`) hasta `effective_until`
+    (el día anterior al siguiente registro, `next_threshold`), o sin fin si es null. Los
+    registros posteriores no se tocan nunca.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "proposal_id": _PROPOSAL_EXAMPLE["id"],
+                    "action": "update_ftp",
+                    "threshold_id": "5d2c1b0a-9e8f-4a7b-8c6d-5e4f3a2b1c0d",
+                    "previous_ftp_w": 220,
+                    "proposed_ftp_w": 230,
+                    "effective_from": "2026-11-15",
+                    "effective_until": "2026-11-30",
+                    "next_threshold": {
+                        "id": "6e3d2c1b-0a9f-4b8c-9d7e-6f5a4b3c2d1e",
+                        "effective_from": "2026-12-01",
+                        "ftp_w": 235,
+                    },
+                    "warnings": [
+                        {
+                            "code": "later_thresholds",
+                            "message": "Hay umbrales registrados desde el 2026-12-01: el FTP"
+                            " nuevo sólo regirá hasta el 2026-11-30 y después seguirá"
+                            " vigente el de ese registro (235 W).",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    proposal_id: UUID
+    action: AcceptAction
+    threshold_id: UUID | None = Field(description="Fila que se actualizaría (`update_ftp`).")
+    previous_ftp_w: int | None = Field(
+        description=(
+            "FTP de `test_date` antes de aceptar: el de la fila de esa fecha (`update_ftp`) o"
+            " el vigente ese día (`create_row`). Null si no había."
+        )
+    )
+    proposed_ftp_w: int
+    effective_from: date
+    effective_until: date | None = Field(description="Último día de vigencia; null = sin fin.")
+    next_threshold: NextThresholdOut | None
+    warnings: list[PreviewWarningOut]
+
+
+class ThresholdProposalAccept(BaseModel):
+    """Confirma lo que mostró la vista previa. Si ya no coincide, 409 con la vista nueva."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"action": "update_ftp", "previous_ftp_w": 220}]},
+    )
+
+    action: AcceptAction
+    previous_ftp_w: int | None = Field(
+        description="`previous_ftp_w` de la vista previa (null si no había FTP)."
+    )

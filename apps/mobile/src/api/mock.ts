@@ -159,6 +159,7 @@ export const mockApi = {
       weight_kg: body.weight_kg ?? null,
       source: body.source ?? 'manual',
       notes: body.notes ?? null,
+      ftp_proposal_id: null,
       created_at: now,
       updated_at: now,
     };
