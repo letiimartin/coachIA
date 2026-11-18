@@ -29,10 +29,18 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react-native';
+// Tipos de evento y detalle (fase 1a, #24).
+import { CalendarX2, ExternalLink, HeartPulse, Plane, UserRound, Users } from 'lucide-react-native';
 
 import { colors } from './theme';
 
 const ICONS = {
+  eventSocial: Users,
+  eventTravel: Plane,
+  eventHealth: HeartPulse,
+  eventPersonal: UserRound,
+  eventUnavailable: CalendarX2,
+  externalLink: ExternalLink,
   today: House,
   plan: CalendarDays,
   coach: MessageCircle,

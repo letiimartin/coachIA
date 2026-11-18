@@ -23,6 +23,7 @@ import ThresholdFormScreen from './src/screens/athlete/ThresholdFormScreen';
 import AvailabilityScreen from './src/screens/athlete/AvailabilityScreen';
 import EventsScreen from './src/screens/calendar/EventsScreen';
 import EventFormScreen from './src/screens/calendar/EventFormScreen';
+import EventDetailScreen from './src/screens/calendar/EventDetailScreen';
 import DashboardScreen from './src/screens/home/DashboardScreen';
 import PerformanceScreen from './src/screens/performance/PerformanceScreen';
 import CoachChatScreen from './src/screens/coach/CoachChatScreen';
@@ -183,6 +184,7 @@ export default function App() {
             <Stack.Screen name="Thresholds" component={ThresholdsScreen} />
             <Stack.Screen name="ThresholdForm" component={ThresholdFormScreen} />
             <Stack.Screen name="Availability" component={AvailabilityScreen} />
+            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="EventForm" component={EventFormScreen} />
             <Stack.Screen name="Integrations" component={IntegrationsScreen} />
           </Stack.Navigator>
