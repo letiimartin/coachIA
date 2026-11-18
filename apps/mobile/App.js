@@ -24,7 +24,7 @@ import AvailabilityScreen from './src/screens/athlete/AvailabilityScreen';
 import EventsScreen from './src/screens/calendar/EventsScreen';
 import EventFormScreen from './src/screens/calendar/EventFormScreen';
 import DashboardScreen from './src/screens/home/DashboardScreen';
-import WorkoutsScreen from './src/screens/workouts/WorkoutsScreen';
+import PerformanceScreen from './src/screens/performance/PerformanceScreen';
 import CoachChatScreen from './src/screens/coach/CoachChatScreen';
 import IntegrationsScreen from './src/screens/integrations/IntegrationsScreen';
 
@@ -136,7 +136,7 @@ function TabNavigator({ onLogout }) {
       <Tab.Screen name="Hoy" component={DashboardScreen} />
       <Tab.Screen name="Plan" component={EventsScreen} />
       <Tab.Screen name="Coach" component={CoachChatScreen} />
-      <Tab.Screen name="Rendimiento" component={WorkoutsScreen} />
+      <Tab.Screen name="Rendimiento" component={PerformanceScreen} />
       <Tab.Screen name="Perfil">
         {(props) => <AthleteProfileScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
