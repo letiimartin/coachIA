@@ -6,6 +6,7 @@ import type {
   CalendarEventOut,
   CalendarEventPatch,
   CurrentThresholdOut,
+  FitnessSeriesOut,
   ProfileOut,
   ProfilePatch,
   ThresholdCreate,
@@ -36,6 +37,13 @@ export const athleteApi = {
     withMock(
       () => request<ThresholdOut>('POST', '/v1/athlete/thresholds', { body }),
       () => mockApi.createThreshold(body),
+    ),
+
+  /** Carga diaria y CTL/ATL/TSB de cada día de `[from, to]` (calculadas por la API; máx. 366 días). */
+  getFitness: (from: string, to: string) =>
+    withMock(
+      () => request<FitnessSeriesOut>('GET', '/v1/athlete/fitness', { query: { from, to } }),
+      mockApi.getFitness,
     ),
 
   getAvailability: () =>

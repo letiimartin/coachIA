@@ -7,6 +7,7 @@ export type RootStackParamList = {
   ThresholdForm: { current: ThresholdOut | null };
   Availability: undefined;
   EventForm: { event?: CalendarEventOut };
+  EventDetail: { event: CalendarEventOut };
   /** Vuelta del OAuth de Wahoo: la API redirige a `…/integrations?provider=wahoo&status=…&reason=…`. */
   Integrations: { provider?: string; status?: string; reason?: string } | undefined;
 };

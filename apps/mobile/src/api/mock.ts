@@ -12,6 +12,7 @@ import type {
   CalendarEventOut,
   CalendarEventPatch,
   CurrentThresholdOut,
+  FitnessSeriesOut,
   ProfileOut,
   ProfilePatch,
   RaceOut,
@@ -157,6 +158,9 @@ export const mockApi = {
     db.thresholds.push(created);
     return delay(created);
   },
+
+  /** El ejemplo del contrato tal cual (sus fechas no se ajustan al rango pedido). */
+  getFitness: () => delay(example<FitnessSeriesOut>('FitnessSeriesOut')),
 
   getAvailability: () => delay(db.availability),
 

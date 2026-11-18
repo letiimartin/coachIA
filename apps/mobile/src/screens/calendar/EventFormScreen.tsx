@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { calendarApi } from '../../api/athleteApi';
@@ -27,6 +27,7 @@ import {
   RACE_PRIORITY_LABELS,
   TRAINING_IMPACT_LABELS,
 } from '../../ui/labels';
+import { colors, lines, spacing } from '../../ui/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventForm'>;
 
@@ -133,12 +134,17 @@ export default function EventFormScreen({ navigation, route }: Props) {
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const run = async (kind: 'save' | 'delete' | 'confirm', action: () => Promise<unknown>) => {
+  /** Ejecuta la acción y vuelve. Al editar, el detalle recibe el evento actualizado. */
+  const run = async (kind: 'save' | 'delete' | 'confirm', action: () => Promise<CalendarEventOut | void>) => {
     setBusy(kind);
     setError(null);
     try {
-      await action();
-      navigation.goBack();
+      const result = await action();
+      const routes = navigation.getState().routes;
+      const fromDetail = routes[routes.length - 2]?.name === 'EventDetail';
+      if (kind === 'delete') navigation.popToTop();
+      else if (result && fromDetail) navigation.popTo('EventDetail', { event: result });
+      else navigation.goBack();
     } catch (e) {
       setError(errorText(e));
       setBusy(null);
@@ -173,27 +179,33 @@ export default function EventFormScreen({ navigation, route }: Props) {
       <Section>
         <Chips label="Tipo" options={options(EVENT_KIND_LABELS)} value={form.kind} onChange={(v) => set('kind', v)} />
         <Field label="Título" value={form.title} onChangeText={(v) => set('title', v)} />
+      </Section>
+
+      <Section title="Fecha">
         <SwitchField label="Todo el día" value={form.all_day} onValueChange={(v) => set('all_day', v)} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 2 }}>
+        <View style={local.pair}>
+          <View style={local.date}>
             <Field label="Inicio" value={form.start_date} onChangeText={(v) => set('start_date', v)} placeholder="AAAA-MM-DD" />
           </View>
           {!form.all_day ? (
-            <View style={{ flex: 1 }}>
+            <View style={local.time}>
               <Field label="Hora" value={form.start_time} onChangeText={(v) => set('start_time', v)} placeholder="HH:MM" />
             </View>
           ) : null}
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 2 }}>
+        <View style={local.pair}>
+          <View style={local.date}>
             <Field label="Fin (opcional)" value={form.end_date} onChangeText={(v) => set('end_date', v)} placeholder="AAAA-MM-DD" />
           </View>
           {!form.all_day ? (
-            <View style={{ flex: 1 }}>
+            <View style={local.time}>
               <Field label="Hora" value={form.end_time} onChangeText={(v) => set('end_time', v)} placeholder="HH:MM" />
             </View>
           ) : null}
         </View>
+      </Section>
+
+      <Section title="Entrenamiento">
         <Chips
           label="Impacto en el entrenamiento"
           options={options(TRAINING_IMPACT_LABELS)}
@@ -210,16 +222,32 @@ export default function EventFormScreen({ navigation, route }: Props) {
             <Button title="Confirmar datos completados" variant="secondary" onPress={confirmRaceData} loading={busy === 'confirm'} disabled={!!busy} />
           ) : null}
           <Chips label="Disciplina" options={options(RACE_DISCIPLINE_LABELS)} value={form.discipline} onChange={(v) => set('discipline', v)} allowNone />
-          <Field label="Distancia (km)" value={form.distance_km} onChangeText={(v) => set('distance_km', v)} keyboardType="decimal-pad" />
-          <Field label="Desnivel positivo (m)" value={form.ascent_m} onChangeText={(v) => set('ascent_m', v)} keyboardType="number-pad" />
+          <View style={local.pair}>
+            <View style={local.half}>
+              <Field label="Distancia (km)" value={form.distance_km} onChangeText={(v) => set('distance_km', v)} keyboardType="decimal-pad" />
+            </View>
+            <View style={local.half}>
+              <Field label="Desnivel positivo (m)" value={form.ascent_m} onChangeText={(v) => set('ascent_m', v)} keyboardType="number-pad" />
+            </View>
+          </View>
           <Chips label="Prioridad" options={options(RACE_PRIORITY_LABELS)} value={form.priority} onChange={(v) => set('priority', v)} />
           <Field label="Objetivo" value={form.goal} onChangeText={(v) => set('goal', v)} multiline />
           <Field label="Web oficial" value={form.source_url} onChangeText={(v) => set('source_url', v)} placeholder="https://…" keyboardType="url" />
         </Section>
       ) : null}
 
-      <Button title={event ? 'Guardar cambios' : 'Crear evento'} onPress={save} loading={busy === 'save'} disabled={!!busy} />
-      {event ? <Button title="Borrar evento" variant="danger" onPress={remove} loading={busy === 'delete'} disabled={!!busy} /> : null}
+      <View style={local.actions}>
+        <Button title={event ? 'Guardar cambios' : 'Crear evento'} onPress={save} loading={busy === 'save'} disabled={!!busy} />
+        {event ? <Button title="Borrar evento" variant="danger" onPress={remove} loading={busy === 'delete'} disabled={!!busy} /> : null}
+      </View>
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  pair: { flexDirection: 'row', gap: spacing.sm },
+  date: { flex: 2 },
+  time: { flex: 1 },
+  half: { flex: 1 },
+  actions: { gap: spacing.md, paddingTop: spacing.sm, borderTopWidth: lines.hairline, borderTopColor: colors.separator },
+});
