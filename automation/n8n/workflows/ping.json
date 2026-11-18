@@ -1,0 +1,102 @@
+{
+  "id": "coachiaping00001",
+  "name": "CoachIA · Ping de la API interna",
+  "active": false,
+  "nodes": [
+    {
+      "id": "6f0c1d52-2f1e-4c8e-9d0a-0a1b2c3d4e01",
+      "name": "Ejecutar a mano",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "6f0c1d52-2f1e-4c8e-9d0a-0a1b2c3d4e02",
+      "name": "GET /internal/ping",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $env.API_BASE_URL }}/internal/ping",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coachiainternal1",
+          "name": "CoachIA API interna"
+        }
+      }
+    },
+    {
+      "id": "6f0c1d52-2f1e-4c8e-9d0a-0a1b2c3d4e03",
+      "name": "Conexión y clave correctas",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "status",
+              "type": "string",
+              "value": "={{ $json.status }}"
+            },
+            {
+              "id": "a2",
+              "name": "api_base_url",
+              "type": "string",
+              "value": "={{ $env.API_BASE_URL }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Ejecutar a mano": {
+      "main": [
+        [
+          {
+            "node": "GET /internal/ping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /internal/ping": {
+      "main": [
+        [
+          {
+            "node": "Conexión y clave correctas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "tags": []
+}
