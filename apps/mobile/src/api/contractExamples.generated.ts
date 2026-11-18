@@ -338,6 +338,48 @@ export const contractExamples: Record<string, unknown[]> = {
       "request_id": "6f1c2a8e3b9d4f7a"
     }
   ],
+  "ExerciseLastLogOut": [
+    {
+      "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "exercise": {
+        "aliases": [
+          "Sentadilla con barra",
+          "Back squat"
+        ],
+        "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+        "mode": "reps",
+        "muscle_group": "quadriceps",
+        "name": "Sentadilla trasera",
+        "origin": "system",
+        "slug": "back_squat"
+      },
+      "performed_on": "2026-11-12",
+      "planned_workout_id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+      "sets": [
+        {
+          "completed": true,
+          "reps": 8,
+          "rir": 2,
+          "set_number": 1,
+          "weight_kg": 60
+        }
+      ]
+    }
+  ],
+  "ExerciseOut": [
+    {
+      "aliases": [
+        "Sentadilla con barra",
+        "Back squat"
+      ],
+      "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+      "mode": "reps",
+      "muscle_group": "quadriceps",
+      "name": "Sentadilla trasera",
+      "origin": "system",
+      "slug": "back_squat"
+    }
+  ],
   "FitnessSeriesOut": [
     {
       "days": [
@@ -365,6 +407,18 @@ export const contractExamples: Record<string, unknown[]> = {
       ],
       "from": "2026-11-10",
       "to": "2026-11-12"
+    }
+  ],
+  "PlannedWorkoutOut": [
+    {
+      "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
+      "created_at": "2026-11-18T10:00:00Z",
+      "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+      "scheduled_on": "2026-11-19",
+      "sport": "strength",
+      "status": "planned",
+      "title": "Fuerza de piernas",
+      "updated_at": "2026-11-18T10:00:00Z"
     }
   ],
   "ProfileOut": [
@@ -414,6 +468,79 @@ export const contractExamples: Record<string, unknown[]> = {
     {
       "enrichment_status": "confirmed",
       "priority": "B"
+    }
+  ],
+  "StrengthSetsPut": [
+    {
+      "sets": [
+        {
+          "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+          "reps": 8,
+          "rir": 2,
+          "set_number": 1,
+          "weight_kg": 60
+        },
+        {
+          "completed": false,
+          "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+          "reps": 6,
+          "set_number": 2,
+          "weight_kg": 60
+        }
+      ]
+    }
+  ],
+  "StrengthWorkoutComplete": [
+    {
+      "duration_s": 3000,
+      "rpe": 7,
+      "started_at": "2026-11-19T18:30:00+01:00"
+    }
+  ],
+  "StrengthWorkoutOut": [
+    {
+      "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
+      "created_at": "2026-11-18T10:00:00Z",
+      "exercises": [
+        {
+          "exercise": {
+            "aliases": [
+              "Sentadilla con barra",
+              "Back squat"
+            ],
+            "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+            "mode": "reps",
+            "muscle_group": "quadriceps",
+            "name": "Sentadilla trasera",
+            "origin": "system",
+            "slug": "back_squat"
+          },
+          "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+          "position": 1,
+          "sets": 3,
+          "target_reps": 8,
+          "target_rir": 2,
+          "target_weight_kg": 60
+        }
+      ],
+      "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+      "scheduled_on": "2026-11-19",
+      "set_logs": [
+        {
+          "completed": true,
+          "exercise_id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+          "id": "1f2e3d4c-5b6a-4978-8a7b-6c5d4e3f2a1b",
+          "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+          "reps": 8,
+          "rir": 2,
+          "set_number": 1,
+          "weight_kg": 60
+        }
+      ],
+      "sport": "strength",
+      "status": "planned",
+      "title": "Fuerza de piernas",
+      "updated_at": "2026-11-18T10:00:00Z"
     }
   ],
   "ThresholdCreate": [
