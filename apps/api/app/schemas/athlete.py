@@ -10,7 +10,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from app.metrics.zones import HrZoneSport, Zone, hr_zones, power_zones
+from app.metrics.zones import (
+    HrZoneSport,
+    Zone,
+    hr_zones,
+    pace_zones,
+    power_zones,
+    trail_hr_zones,
+)
 from app.models.athlete import PreferredTime, Sex, ThresholdSource
 from app.models.common import Sport
 
@@ -35,7 +42,13 @@ Timezone = Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_ch
 SportList = Annotated[list[Sport], Field(max_length=len(Sport)), AfterValidator(_check_unique)]
 HeightCm = Annotated[float, Field(ge=100, le=250, description="Altura en cm (1 decimal).")]
 FtpW = Annotated[int, Field(ge=50, le=700, description="FTP en vatios.")]
-LthrBpm = Annotated[int, Field(ge=80, le=230, description="FC de umbral láctico (ppm).")]
+CyclingLthrBpm = Annotated[
+    int, Field(ge=80, le=230, description="FC de umbral láctico en ciclismo (ppm).")
+]
+RunningLthrBpm = Annotated[
+    int,
+    Field(ge=80, le=230, description="FC de umbral láctico en carrera (ppm). La usa el trail."),
+]
 HrMaxBpm = Annotated[int, Field(ge=100, le=240, description="FC máxima (ppm).")]
 HrRestBpm = Annotated[int, Field(ge=25, le=120, description="FC en reposo (ppm).")]
 PaceSPerKm = Annotated[
@@ -124,7 +137,8 @@ class ProfilePatch(BaseModel):
 _THRESHOLD_FIELDS: dict[str, Any] = {
     "effective_from": "2026-11-01",
     "ftp_w": 230,
-    "lthr_bpm": 168,
+    "cycling_lthr_bpm": 165,
+    "running_lthr_bpm": 172,
     "hr_max_bpm": 186,
     "hr_rest_bpm": 48,
     "threshold_pace_s_per_km": 285.0,
@@ -137,6 +151,7 @@ _THRESHOLD_FIELDS: dict[str, Any] = {
 _THRESHOLD_EXAMPLE: dict[str, Any] = {
     "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
     **_THRESHOLD_FIELDS,
+    "legacy_lthr_bpm": None,
     "created_at": "2026-11-01T19:00:00Z",
     "updated_at": "2026-11-01T19:00:00Z",
 }
@@ -147,13 +162,17 @@ class ThresholdCreate(BaseModel):
 
     Es una foto completa: los valores que no se envían quedan vacíos para esa fecha. La app
     debería precargar el formulario con el umbral vigente. Debe incluir al menos un umbral.
+
+    El LTHR va por disciplina: `cycling_lthr_bpm` (carga por FC de ciclismo) y
+    `running_lthr_bpm` (zonas y carga de trail). `legacy_lthr_bpm` es de sólo lectura.
     """
 
     model_config = ConfigDict(extra="forbid", json_schema_extra={"examples": [_THRESHOLD_FIELDS]})
 
     effective_from: date
     ftp_w: FtpW | None = None
-    lthr_bpm: LthrBpm | None = None
+    cycling_lthr_bpm: CyclingLthrBpm | None = None
+    running_lthr_bpm: RunningLthrBpm | None = None
     hr_max_bpm: HrMaxBpm | None = None
     hr_rest_bpm: HrRestBpm | None = None
     threshold_pace_s_per_km: PaceSPerKm | None = None
@@ -166,7 +185,8 @@ class ThresholdCreate(BaseModel):
     def _coherent(self) -> Self:
         values = (
             self.ftp_w,
-            self.lthr_bpm,
+            self.cycling_lthr_bpm,
+            self.running_lthr_bpm,
             self.hr_max_bpm,
             self.hr_rest_bpm,
             self.threshold_pace_s_per_km,
@@ -181,12 +201,10 @@ class ThresholdCreate(BaseModel):
             and self.hr_rest_bpm >= self.hr_max_bpm
         ):
             raise ValueError("hr_rest_bpm debe ser menor que hr_max_bpm")
-        if (
-            self.lthr_bpm is not None
-            and self.hr_max_bpm is not None
-            and self.lthr_bpm > self.hr_max_bpm
-        ):
-            raise ValueError("lthr_bpm no puede ser mayor que hr_max_bpm")
+        for name in ("cycling_lthr_bpm", "running_lthr_bpm"):
+            lthr = getattr(self, name)
+            if lthr is not None and self.hr_max_bpm is not None and lthr > self.hr_max_bpm:
+                raise ValueError(f"{name} no puede ser mayor que hr_max_bpm")
         return self
 
 
@@ -198,7 +216,15 @@ class ThresholdOut(BaseModel):
     id: UUID
     effective_from: date
     ftp_w: int | None
-    lthr_bpm: int | None
+    cycling_lthr_bpm: int | None
+    running_lthr_bpm: int | None
+    legacy_lthr_bpm: int | None = Field(
+        description=(
+            "LTHR único anterior a la separación por disciplina. Sólo lectura: ningún cálculo"
+            " lo usa; está para decidir a qué disciplina pertenecía."
+        ),
+        json_schema_extra={"readOnly": True},
+    )
     hr_max_bpm: int | None
     hr_rest_bpm: int | None
     threshold_pace_s_per_km: float | None
@@ -213,13 +239,17 @@ class ThresholdOut(BaseModel):
 class ZoneOut(BaseModel):
     """Zona `[low, high)` tal como la calcula `app.metrics.zones.Zone`.
 
-    Unidades: vatios en las zonas de potencia y ppm en las de FC. `high` null: sin límite.
+    Unidades: vatios en las zonas de potencia, ppm en las de FC y s/km en las de ritmo.
+    `high` null: sin límite. En las de ritmo un número mayor es más lento: `low` es el límite
+    rápido (incluido) y `high` el lento (excluido), así que la Z1 no tiene `high`.
     """
 
     model_config = ConfigDict(from_attributes=True)
 
     number: int = Field(ge=1, description="Posición de la zona (1 = la más suave).")
-    code: str = Field(description="Código de la zona: Z1…Z7 (potencia) o Z1…Z5c (FC).")
+    code: str = Field(
+        description="Código: Z1…Z7 (potencia), Z1…Z5c (FC de 7 zonas) o Z1…Z5 (5 zonas)."
+    )
     name: str
     low: float
     high: float | None
@@ -246,12 +276,21 @@ def _example_zones(zones: tuple[Zone, ...]) -> list[dict[str, Any]]:
 class ZonesOut(BaseModel):
     """Zonas calculadas a partir del umbral vigente. Null si falta el umbral correspondiente.
 
+    Referencia de cada disciplina: `power` (ciclismo), `running_pace` (carrera) y `trail_hr`
+    (trail).
+
     - `power`: 7 zonas de Coggan sobre `ftp_w` (W).
-    - `hr_cycling` / `hr_running`: 7 zonas de Friel sobre `lthr_bpm` (ppm), tabla de ciclismo
-      y de carrera.
+    - `running_pace`: 5 zonas de ritmo de Friel sobre `threshold_pace_s_per_km` (s/km; la app
+      lo muestra en min/km).
+    - `trail_hr`: 5 zonas de FC de Friel sobre `running_lthr_bpm` (ppm).
+    - `hr_cycling`: 7 zonas de Friel sobre `cycling_lthr_bpm` (ppm). Las usa la carga por FC de
+      ciclismo; la app no las muestra.
+    - `hr_running`: 7 zonas de Friel (tabla de carrera) sobre `running_lthr_bpm` (ppm).
     """
 
     power: list[ZoneOut] | None
+    running_pace: list[ZoneOut] | None
+    trail_hr: list[ZoneOut] | None
     hr_cycling: list[ZoneOut] | None
     hr_running: list[ZoneOut] | None
 
@@ -261,8 +300,10 @@ _CURRENT_EXAMPLE: dict[str, Any] = {
     "threshold": _THRESHOLD_EXAMPLE,
     "zones": {
         "power": _example_zones(power_zones(230)),
-        "hr_cycling": _example_zones(hr_zones(168, HrZoneSport.CYCLING)),
-        "hr_running": _example_zones(hr_zones(168, HrZoneSport.RUNNING)),
+        "running_pace": _example_zones(pace_zones(285.0)),
+        "trail_hr": _example_zones(trail_hr_zones(172)),
+        "hr_cycling": _example_zones(hr_zones(165, HrZoneSport.CYCLING)),
+        "hr_running": _example_zones(hr_zones(172, HrZoneSport.RUNNING)),
     },
 }
 

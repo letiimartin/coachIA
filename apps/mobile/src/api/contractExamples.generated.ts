@@ -67,13 +67,14 @@ export const contractExamples: Record<string, unknown[]> = {
       "on": "2026-11-17",
       "threshold": {
         "created_at": "2026-11-01T19:00:00Z",
+        "cycling_lthr_bpm": 165,
         "effective_from": "2026-11-01",
         "ftp_w": 230,
         "hr_max_bpm": 186,
         "hr_rest_bpm": 48,
         "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
-        "lthr_bpm": 168,
         "notes": "Test de 20 min en rodillo.",
+        "running_lthr_bpm": 172,
         "source": "test",
         "threshold_pace_s_per_km": 285,
         "updated_at": "2026-11-01T19:00:00Z",
@@ -84,49 +85,49 @@ export const contractExamples: Record<string, unknown[]> = {
         "hr_cycling": [
           {
             "code": "Z1",
-            "high": 136.1,
+            "high": 133.7,
             "low": 0,
             "name": "Recuperación",
             "number": 1
           },
           {
             "code": "Z2",
-            "high": 151.2,
-            "low": 136.1,
+            "high": 148.5,
+            "low": 133.7,
             "name": "Resistencia aeróbica",
             "number": 2
           },
           {
             "code": "Z3",
-            "high": 157.9,
-            "low": 151.2,
+            "high": 155.1,
+            "low": 148.5,
             "name": "Tempo",
             "number": 3
           },
           {
             "code": "Z4",
-            "high": 168,
-            "low": 157.9,
+            "high": 165,
+            "low": 155.1,
             "name": "Subumbral",
             "number": 4
           },
           {
             "code": "Z5a",
-            "high": 173,
-            "low": 168,
+            "high": 170,
+            "low": 165,
             "name": "Supraumbral",
             "number": 5
           },
           {
             "code": "Z5b",
-            "high": 178.1,
-            "low": 173,
+            "high": 174.9,
+            "low": 170,
             "name": "Capacidad aeróbica",
             "number": 6
           },
           {
             "code": "Z5c",
-            "low": 178.1,
+            "low": 174.9,
             "name": "Potencia anaeróbica",
             "number": 7
           }
@@ -134,49 +135,49 @@ export const contractExamples: Record<string, unknown[]> = {
         "hr_running": [
           {
             "code": "Z1",
-            "high": 142.8,
+            "high": 146.2,
             "low": 0,
             "name": "Recuperación",
             "number": 1
           },
           {
             "code": "Z2",
-            "high": 151.2,
-            "low": 142.8,
+            "high": 154.8,
+            "low": 146.2,
             "name": "Resistencia aeróbica",
             "number": 2
           },
           {
             "code": "Z3",
-            "high": 159.6,
-            "low": 151.2,
+            "high": 163.4,
+            "low": 154.8,
             "name": "Tempo",
             "number": 3
           },
           {
             "code": "Z4",
-            "high": 168,
-            "low": 159.6,
+            "high": 172,
+            "low": 163.4,
             "name": "Subumbral",
             "number": 4
           },
           {
             "code": "Z5a",
-            "high": 173,
-            "low": 168,
+            "high": 177.2,
+            "low": 172,
             "name": "Supraumbral",
             "number": 5
           },
           {
             "code": "Z5b",
-            "high": 178.1,
-            "low": 173,
+            "high": 182.3,
+            "low": 177.2,
             "name": "Capacidad aeróbica",
             "number": 6
           },
           {
             "code": "Z5c",
-            "low": 178.1,
+            "low": 182.3,
             "name": "Potencia anaeróbica",
             "number": 7
           }
@@ -229,6 +230,78 @@ export const contractExamples: Record<string, unknown[]> = {
             "low": 345,
             "name": "Neuromuscular",
             "number": 7
+          }
+        ],
+        "running_pace": [
+          {
+            "code": "Z1",
+            "low": 367.7,
+            "name": "Recuperación",
+            "number": 1
+          },
+          {
+            "code": "Z2",
+            "high": 367.7,
+            "low": 324.9,
+            "name": "Aeróbico",
+            "number": 2
+          },
+          {
+            "code": "Z3",
+            "high": 324.9,
+            "low": 302.1,
+            "name": "Tempo",
+            "number": 3
+          },
+          {
+            "code": "Z4",
+            "high": 302.1,
+            "low": 285,
+            "name": "Umbral",
+            "number": 4
+          },
+          {
+            "code": "Z5",
+            "high": 285,
+            "low": 0,
+            "name": "Por encima del umbral",
+            "number": 5
+          }
+        ],
+        "trail_hr": [
+          {
+            "code": "Z1",
+            "high": 146.2,
+            "low": 0,
+            "name": "Recuperación",
+            "number": 1
+          },
+          {
+            "code": "Z2",
+            "high": 154.8,
+            "low": 146.2,
+            "name": "Aeróbico",
+            "number": 2
+          },
+          {
+            "code": "Z3",
+            "high": 163.4,
+            "low": 154.8,
+            "name": "Tempo",
+            "number": 3
+          },
+          {
+            "code": "Z4",
+            "high": 172,
+            "low": 163.4,
+            "name": "Umbral",
+            "number": 4
+          },
+          {
+            "code": "Z5",
+            "low": 172,
+            "name": "Por encima del umbral",
+            "number": 5
           }
         ]
       }
@@ -323,12 +396,13 @@ export const contractExamples: Record<string, unknown[]> = {
   ],
   "ThresholdCreate": [
     {
+      "cycling_lthr_bpm": 165,
       "effective_from": "2026-11-01",
       "ftp_w": 230,
       "hr_max_bpm": 186,
       "hr_rest_bpm": 48,
-      "lthr_bpm": 168,
       "notes": "Test de 20 min en rodillo.",
+      "running_lthr_bpm": 172,
       "source": "test",
       "threshold_pace_s_per_km": 285,
       "vo2max": 52,
@@ -338,13 +412,14 @@ export const contractExamples: Record<string, unknown[]> = {
   "ThresholdOut": [
     {
       "created_at": "2026-11-01T19:00:00Z",
+      "cycling_lthr_bpm": 165,
       "effective_from": "2026-11-01",
       "ftp_w": 230,
       "hr_max_bpm": 186,
       "hr_rest_bpm": 48,
       "id": "8d5e2f0a-6b1c-4f3e-9a7d-2c4b6e8f0a1b",
-      "lthr_bpm": 168,
       "notes": "Test de 20 min en rodillo.",
+      "running_lthr_bpm": 172,
       "source": "test",
       "threshold_pace_s_per_km": 285,
       "updated_at": "2026-11-01T19:00:00Z",

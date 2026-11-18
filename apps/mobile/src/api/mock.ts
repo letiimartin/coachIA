@@ -50,7 +50,13 @@ function todayIso(): string {
 function normalizeZones(zones: Partial<Record<keyof ZonesOut, Partial<ZoneOut>[] | null>>): ZonesOut {
   const norm = (list: Partial<ZoneOut>[] | null | undefined): ZoneOut[] | null =>
     list ? list.map((z) => ({ ...(z as ZoneOut), high: z.high ?? null })) : null;
-  return { power: norm(zones.power), hr_cycling: norm(zones.hr_cycling), hr_running: norm(zones.hr_running) };
+  return {
+    power: norm(zones.power),
+    running_pace: norm(zones.running_pace),
+    trail_hr: norm(zones.trail_hr),
+    hr_cycling: norm(zones.hr_cycling),
+    hr_running: norm(zones.hr_running),
+  };
 }
 
 function raceFromCreate(race: CalendarEventCreate['race']): RaceOut {
@@ -130,7 +136,7 @@ export const mockApi = {
     const zones =
       current.id === exampleCurrent.threshold.id
         ? exampleZones
-        : { power: null, hr_cycling: null, hr_running: null };
+        : { power: null, running_pace: null, trail_hr: null, hr_cycling: null, hr_running: null };
     return delay({ on: date, threshold: current, zones });
   },
 
@@ -143,7 +149,9 @@ export const mockApi = {
       id: uuid(),
       effective_from: body.effective_from,
       ftp_w: body.ftp_w ?? null,
-      lthr_bpm: body.lthr_bpm ?? null,
+      cycling_lthr_bpm: body.cycling_lthr_bpm ?? null,
+      running_lthr_bpm: body.running_lthr_bpm ?? null,
+      legacy_lthr_bpm: null,
       hr_max_bpm: body.hr_max_bpm ?? null,
       hr_rest_bpm: body.hr_rest_bpm ?? null,
       threshold_pace_s_per_km: body.threshold_pace_s_per_km ?? null,

@@ -24,12 +24,18 @@ class ActivitySource(enum.StrEnum):
 
 
 class LoadMethod(enum.StrEnum):
-    """Cómo se calculó la carga (TSS): por potencia, FC, ritmo o RPE."""
+    """Cómo se calculó la carga.
+
+    `power`, `heart_rate`, `pace` y `rpe` son TSS (o una estimación de TSS) de resistencia y
+    suman en CTL/ATL. `session_rpe` es la carga de fuerza (minutos × RPE de la sesión, Foster):
+    no es TSS y no suma nunca en `daily_load`.
+    """
 
     POWER = "power"
     HEART_RATE = "heart_rate"
     PACE = "pace"
     RPE = "rpe"
+    SESSION_RPE = "session_rpe"
 
 
 class Activity(TimestampMixin, Base):
@@ -56,6 +62,8 @@ class Activity(TimestampMixin, Base):
     normalized_power_w: Mapped[int | None]
     avg_cadence: Mapped[int | None]
     avg_speed_mps: Mapped[Decimal | None] = mapped_column(sa.Numeric(6, 3))
+    # RPE de la sesión (1-10), introducido por la atleta. Sin valor por defecto.
+    rpe: Mapped[int | None] = mapped_column(sa.SmallInteger)
 
     # Métricas calculadas por el motor de métricas (nunca por el LLM).
     load: Mapped[Decimal | None] = mapped_column(sa.Numeric(6, 1))
@@ -76,4 +84,5 @@ class Activity(TimestampMixin, Base):
         sa.Index("ix_activities_user_id_start_at", "user_id", sa.text("start_at DESC")),
         sa.CheckConstraint("elapsed_s IS NULL OR elapsed_s >= 0", name="elapsed"),
         sa.CheckConstraint("distance_m IS NULL OR distance_m >= 0", name="distance"),
+        sa.CheckConstraint("rpe IS NULL OR rpe BETWEEN 1 AND 10", name="rpe"),
     )

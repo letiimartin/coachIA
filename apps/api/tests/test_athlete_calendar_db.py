@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.security import TokenVerifier
 from app.db.session import Database
 from app.main import create_app
-from app.metrics.zones import HrZoneSport, hr_zones, power_zones
+from app.metrics.zones import HrZoneSport, hr_zones, pace_zones, power_zones, trail_hr_zones
 from app.models import AthleteThreshold, AvailabilitySlot, Race
 from app.schemas.athlete import WeekAvailability
 from tests.conftest import (
@@ -156,7 +156,9 @@ def test_thresholds_list_create_and_conflict(
     assert body["weight_kg"] == 58.25
     assert body["threshold_pace_s_per_km"] == 290.5
     assert body["source"] == "manual"
-    assert body["lthr_bpm"] is None
+    assert body["cycling_lthr_bpm"] is None
+    assert body["running_lthr_bpm"] is None
+    assert body["legacy_lthr_bpm"] is None
 
     db_client.post(
         "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-11-01", ftp_w=230)
@@ -169,7 +171,7 @@ def test_thresholds_list_create_and_conflict(
     assert [row["effective_from"] for row in listed] == ["2026-11-01", "2026-10-01", "2026-09-01"]
 
     duplicate = db_client.post(
-        "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-10-01", lthr_bpm=170)
+        "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-10-01", ftp_w=240)
     )
     assert duplicate.status_code == 409
     assert duplicate.json()["error"]["code"] == "conflict"
@@ -193,7 +195,11 @@ def test_current_threshold_picks_latest_row_on_date(
         "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-09-01", ftp_w=220)
     )
     db_client.post(
-        "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-10-01", lthr_bpm=170)
+        "/v1/athlete/thresholds",
+        headers=headers,
+        json=_threshold(
+            "2026-10-01", cycling_lthr_bpm=170, running_lthr_bpm=177, threshold_pace_s_per_km=292
+        ),
     )
 
     before = db_client.get("/v1/athlete/thresholds/current?on=2026-08-31", headers=headers)
@@ -206,6 +212,8 @@ def test_current_threshold_picks_latest_row_on_date(
     assert body["threshold"]["ftp_w"] == 220
     assert body["zones"]["hr_cycling"] is None
     assert body["zones"]["hr_running"] is None
+    assert body["zones"]["running_pace"] is None
+    assert body["zones"]["trail_hr"] is None
     assert [zone["low"] for zone in body["zones"]["power"]] == [z.low for z in power_zones(220)]
 
     # Fila completa, sin combinar con la anterior: el FTP de septiembre no se arrastra.
@@ -215,9 +223,37 @@ def test_current_threshold_picks_latest_row_on_date(
     assert [z["high"] for z in october["zones"]["hr_cycling"]] == [
         z.high for z in hr_zones(170, HrZoneSport.CYCLING)
     ]
-    assert [z["code"] for z in october["zones"]["hr_running"]] == [
-        z.code for z in hr_zones(170, HrZoneSport.RUNNING)
+    assert [z["low"] for z in october["zones"]["hr_running"]] == [
+        z.low for z in hr_zones(177, HrZoneSport.RUNNING)
     ]
+    assert [(z["code"], z["low"], z["high"]) for z in october["zones"]["trail_hr"]] == [
+        (z.code, z.low, z.high) for z in trail_hr_zones(177)
+    ]
+    assert [(z["low"], z["high"]) for z in october["zones"]["running_pace"]] == [
+        (z.low, z.high) for z in pace_zones(292)
+    ]
+
+
+def test_threshold_rejects_old_lthr_field_and_lthr_above_hr_max(
+    db_client: TestClient, headers: Headers
+) -> None:
+    old = db_client.post(
+        "/v1/athlete/thresholds", headers=headers, json=_threshold("2026-10-01", lthr_bpm=170)
+    )
+    assert old.status_code == 422
+    readonly = db_client.post(
+        "/v1/athlete/thresholds",
+        headers=headers,
+        json=_threshold("2026-10-01", legacy_lthr_bpm=170),
+    )
+    assert readonly.status_code == 422
+    for field in ("cycling_lthr_bpm", "running_lthr_bpm"):
+        too_high = db_client.post(
+            "/v1/athlete/thresholds",
+            headers=headers,
+            json=_threshold("2026-10-01", hr_max_bpm=180, **{field: 181}),
+        )
+        assert too_high.status_code == 422
 
 
 def test_current_threshold_defaults_to_today_in_athlete_timezone(

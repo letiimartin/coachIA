@@ -9,11 +9,29 @@ actividades). No hace commit: lo hace quien llama.
 
 Criterios:
 - El día de una actividad es el local en la zona horaria del atleta.
-- Duración: `moving_s`. Sin ella no hay carga (no se inventa).
-- Potencia sólo en ciclismo (el FTP es de bici) y ritmo sólo en carrera y trail (el ritmo
-  umbral es de carrera). La FC vale para cualquier deporte.
+- Duración: `moving_s` en los métodos TSS (sin ella no hay carga; no se inventa). La fuerza usa
+  `moving_s` o, si no hay, `elapsed_s`.
+- El método de carga va por deporte (`app.metrics.load.LOAD_RULES`) y el LTHR de cada deporte
+  sale de `app.metrics.zones.lthr_field_for`.
+- La carga diaria sólo suma resistencia (`counts_in_daily_load`): la fuerza (`strength`, y
+  cualquier carga `session_rpe`) no suma nunca, aunque conserve una carga TSS antigua.
+- Senderismo, natación y otros sólo se registran: no se les calcula carga y las que ya tienen
+  se conservan siempre como dato histórico (tampoco el recálculo explícito las borra). Mientras
+  dure la protección, esas cargas históricas siguen contando en la curva, para que no cambie
+  antes de que la autora apruebe el recálculo; el recálculo explícito ya las excluye, y
+  `simulate_curve` enseña cuánto cambia la curva al excluirlas.
 - Las actividades marcadas como duplicadas (`duplicate_of_id`) tienen su carga, pero no suman
   en la carga diaria. Las de carga por RPE (manual) no se recalculan.
+
+Protección de las cargas existentes (#22): los recálculos automáticos (sync, umbral nuevo) sólo
+calculan la carga de las actividades que no la tienen; nunca borran ni cambian una que ya
+existe, aunque ahora no se pudiera calcular. Cambiar cargas existentes es el recálculo histórico
+explícito (`recompute_from(..., overwrite_existing=True)`, vía `scripts/recompute_loads.py`),
+que tiene modos de simulación (`simulate_recompute`, `simulate_curve`) que no escriben nada.
+
+La protección se levanta con `AUTOMATIC_RECOMPUTE_OVERWRITES`. Al aprobarlo, primero se
+despliega con True y después se ejecuta el recálculo explícito, para que ningún gancho
+automático vuelva a meter en la curva lo que el recálculo excluye.
 """
 
 import bisect
@@ -30,14 +48,16 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.metrics.fitness import FitnessDay, fitness_series
-from app.metrics.load import LoadResult, activity_load
-from app.models import Activity, AthleteThreshold, DailyLoad, LoadMethod, Sport
+from app.metrics.load import LOAD_RULES, LoadResult, activity_load, counts_in_daily_load
+from app.metrics.zones import lthr_field_for
+from app.models import Activity, AthleteThreshold, DailyLoad, LoadMethod
 from app.services.athletes import athlete_timezone, today_for
 
 logger = logging.getLogger(__name__)
 
-_POWER_SPORTS = frozenset({Sport.CYCLING})
-_PACE_SPORTS = frozenset({Sport.RUNNING, Sport.TRAIL_RUNNING})
+# Hasta que la autora valide los umbrales por disciplina (#22), los procesos automáticos no
+# cambian cargas existentes. Para levantar la protección basta con poner esto a True.
+AUTOMATIC_RECOMPUTE_OVERWRITES = False
 
 # Límites de las columnas: activities.load Numeric(6,1) e intensity_factor Numeric(4,3).
 _MAX_ACTIVITY_LOAD = Decimal("99999.9")
@@ -84,22 +104,36 @@ def _float(value: Decimal | int | None) -> float | None:
 def compute_activity_load(
     activity: Activity, threshold: AthleteThreshold | None
 ) -> LoadResult | None:
-    """Carga de la actividad con el umbral dado (el vigente en su fecha). Pura, sin BD."""
-    if threshold is None or activity.moving_s is None:
-        return None
+    """Carga de la actividad con el umbral dado (el vigente en su fecha). Pura, sin BD.
+
+    Las cargas por RPE (manuales) no se calculan aquí: quien llama las conserva.
+    """
     sport = activity.sport
+
+    def limit(name: str | None) -> float | None:
+        if threshold is None or name is None:
+            return None
+        return _float(getattr(threshold, name))
+
     return activity_load(
-        activity.moving_s,
-        normalized_power_w=_float(activity.normalized_power_w) if sport in _POWER_SPORTS else None,
-        ftp_w=_float(threshold.ftp_w),
+        sport,
+        _float(activity.moving_s),
+        elapsed_s=_float(activity.elapsed_s),
+        normalized_power_w=_float(activity.normalized_power_w),
+        ftp_w=limit("ftp_w"),
         avg_hr_bpm=_float(activity.avg_hr),
-        lthr_bpm=_float(threshold.lthr_bpm),
-        avg_speed_mps=_float(activity.avg_speed_mps) if sport in _PACE_SPORTS else None,
-        threshold_pace_s_per_km=_float(threshold.threshold_pace_s_per_km),
+        lthr_bpm=limit(lthr_field_for(sport)),
+        avg_speed_mps=_float(activity.avg_speed_mps),
+        threshold_pace_s_per_km=limit("threshold_pace_s_per_km"),
+        rpe=activity.rpe,
     )
 
 
-def _apply_load(activity: Activity, result: LoadResult | None) -> None:
+_StoredLoad = tuple[Decimal | None, LoadMethod | None, Decimal | None]
+
+
+def _stored_values(activity: Activity, result: LoadResult | None) -> _StoredLoad:
+    """Valores tal como se guardarían en `activities` (redondeados y acotados)."""
     load = method = intensity = None
     if result is not None:
         load = _quantize(result.load, _ONE)
@@ -113,12 +147,43 @@ def _apply_load(activity: Activity, result: LoadResult | None) -> None:
             # Datos absurdos (p. ej. NP muy por encima del FTP): no se guarda una carga falsa.
             logger.warning("Carga fuera de rango en la actividad %s; se deja vacía", activity.id)
             load = method = intensity = None
-    if (activity.load, activity.load_method, activity.intensity_factor) != (
-        load,
-        method,
-        intensity,
-    ):
-        activity.load, activity.load_method, activity.intensity_factor = load, method, intensity
+    return load, method, intensity
+
+
+def _current(activity: Activity) -> _StoredLoad:
+    return activity.load, activity.load_method, activity.intensity_factor
+
+
+def _keeps_current_load(activity: Activity, *, overwrite_existing: bool) -> bool:
+    """RPE (manual) nunca se recalcula; una carga existente sólo con `overwrite_existing`.
+
+    La carga histórica de un deporte que sólo se registra no se recalcula nunca: es el dato
+    que había y no hay método para sustituirla.
+    """
+    if activity.load_method == LoadMethod.RPE:
+        return True
+    if activity.load is not None and LOAD_RULES[activity.sport].registered_only:
+        return True
+    return activity.load is not None and not overwrite_existing
+
+
+def _counts_in_curve(activity: Activity, *, overwrite_existing: bool) -> bool:
+    """Si la carga guardada de la actividad suma en `daily_load`.
+
+    Con protección (`overwrite_existing` False), la carga histórica de los deportes que sólo se
+    registran sigue sumando como antes; el recálculo explícito la excluye.
+    """
+    if activity.duplicate_of_id is not None or activity.load is None:
+        return False
+    if counts_in_daily_load(activity.sport, activity.load_method):
+        return True
+    return not overwrite_existing and LOAD_RULES[activity.sport].registered_only
+
+
+def _apply_load(activity: Activity, result: LoadResult | None) -> None:
+    new = _stored_values(activity, result)
+    if _current(activity) != new:
+        activity.load, activity.load_method, activity.intensity_factor = new
 
 
 # --- Recálculo -------------------------------------------------------------------------------
@@ -140,14 +205,25 @@ def _lock_athlete(session: Session, user_id: uuid.UUID) -> None:
 
 
 def recompute_from(
-    session: Session, user_id: uuid.UUID, since: date, *, today: date | None = None
+    session: Session,
+    user_id: uuid.UUID,
+    since: date,
+    *,
+    today: date | None = None,
+    overwrite_existing: bool | None = None,
 ) -> None:
     """Recalcula la carga de las actividades desde `since` y regenera `daily_load`.
+
+    `overwrite_existing` decide si se recalculan también las actividades que ya tienen carga.
+    Por defecto (`None`) vale `AUTOMATIC_RECOMPUTE_OVERWRITES`: los ganchos automáticos sólo
+    rellenan las que no la tienen. El recálculo histórico explícito pasa `True`.
 
     Si no hay serie guardada justo antes de `since` (primera vez, o un hueco), empieza antes:
     en el día siguiente a la última fila guardada o, si no hay ninguna, en la primera actividad.
     Si `since` es anterior a la primera actividad, la serie se regenera entera. Sin commit.
     """
+    if overwrite_existing is None:
+        overwrite_existing = AUTOMATIC_RECOMPUTE_OVERWRITES
     _lock_athlete(session, user_id)
     tz = ZoneInfo(athlete_timezone(session, user_id))
     today = today or datetime.now(tz).date()
@@ -186,10 +262,10 @@ def recompute_from(
     daily: defaultdict[date, float] = defaultdict(float)
     for activity in activities:
         day = _local_day(activity.start_at, tz)
-        if activity.load_method != LoadMethod.RPE:
+        if not _keeps_current_load(activity, overwrite_existing=overwrite_existing):
             _apply_load(activity, compute_activity_load(activity, thresholds.on(day)))
-        if activity.duplicate_of_id is None and activity.load is not None:
-            daily[day] += float(activity.load)
+        if _counts_in_curve(activity, overwrite_existing=overwrite_existing):
+            daily[day] += float(activity.load or 0)
 
     # `start` > `end` si `since` es futuro (p. ej. un umbral que entra en vigor mañana).
     series = (
@@ -208,6 +284,178 @@ def recompute_from(
     if series:
         session.execute(sa.insert(DailyLoad), [_row(user_id, day) for day in series])
     session.flush()
+
+
+# --- Simulación del recálculo histórico ----------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class LoadChange:
+    """Actividad cuya carga o método cambiaría con el recálculo histórico."""
+
+    activity_id: uuid.UUID
+    start_at: datetime
+    sport: str
+    old_load: Decimal | None
+    old_method: LoadMethod | None
+    new_load: Decimal | None
+    new_method: LoadMethod | None
+
+    @property
+    def delta(self) -> Decimal | None:
+        """Diferencia de carga (nueva − antigua); ``None`` si falta alguna de las dos."""
+        if self.old_load is None or self.new_load is None:
+            return None
+        return self.new_load - self.old_load
+
+
+def simulate_recompute(
+    session: Session, user_id: uuid.UUID, since: date = date.min
+) -> list[LoadChange]:
+    """Qué actividades desde `since` cambiarían de carga o de método con el recálculo histórico.
+
+    No escribe nada: calcula con los umbrales actuales y compara con lo guardado. Las cargas por
+    RPE no se recalculan, así que nunca aparecen. Cambios sólo del IF no se informan.
+    """
+    tz = ZoneInfo(athlete_timezone(session, user_id))
+    thresholds = _Thresholds.load(session, user_id)
+    query = (
+        sa.select(Activity)
+        .where(Activity.user_id == user_id)
+        .order_by(Activity.start_at)
+        .execution_options(populate_existing=True)
+    )
+    if since > date.min:
+        query = query.where(Activity.start_at >= _start_of(since, tz))
+    changes: list[LoadChange] = []
+    for activity in session.scalars(query):
+        if _keeps_current_load(activity, overwrite_existing=True):
+            continue
+        day = _local_day(activity.start_at, tz)
+        load, method, _ = _stored_values(
+            activity, compute_activity_load(activity, thresholds.on(day))
+        )
+        if (load, method) != (activity.load, activity.load_method):
+            changes.append(
+                LoadChange(
+                    activity.id,
+                    activity.start_at,
+                    activity.sport,
+                    activity.load,
+                    activity.load_method,
+                    load,
+                    method,
+                )
+            )
+    return changes
+
+
+# --- Simulación de la curva (CTL/ATL/TSB) ------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class CurveDelta:
+    """Diferencia de una curva simulada respecto a la actual en un día."""
+
+    day: date
+    ctl: float
+    atl: float
+    tsb: float
+
+
+@dataclass(frozen=True, slots=True)
+class ExcludedSport:
+    sport: str
+    activities: int
+    load: float
+
+
+@dataclass(frozen=True, slots=True)
+class CurveSimulation:
+    """Curva actual frente a dos simulaciones, de la primera actividad a hoy. No escribe nada.
+
+    - `current`: cargas guardadas con la regla de ahora (protección: la carga histórica de los
+      deportes que sólo se registran sigue sumando).
+    - `without_registered`: las mismas cargas, excluyendo esos deportes. Aísla el efecto de
+      excluirlos.
+    - `after_recompute`: lo que dejaría el recálculo explícito (cargas recalculadas y
+      exclusiones).
+    """
+
+    current: list[FitnessDay]
+    without_registered: list[FitnessDay]
+    after_recompute: list[FitnessDay]
+    excluded: list[ExcludedSport]
+
+    @staticmethod
+    def _deltas(base: list[FitnessDay], other: list[FitnessDay]) -> list[CurveDelta]:
+        return [
+            CurveDelta(a.day, b.ctl - a.ctl, b.atl - a.atl, b.tsb - a.tsb)
+            for a, b in zip(base, other, strict=True)
+        ]
+
+    @property
+    def exclusion_deltas(self) -> list[CurveDelta]:
+        return self._deltas(self.current, self.without_registered)
+
+    @property
+    def recompute_deltas(self) -> list[CurveDelta]:
+        return self._deltas(self.current, self.after_recompute)
+
+
+def simulate_curve(
+    session: Session, user_id: uuid.UUID, *, today: date | None = None
+) -> CurveSimulation:
+    """Cuánto cambiaría la curva al excluir los deportes que sólo se registran, y con el
+    recálculo explícito completo. Calcula desde las actividades; no escribe nada."""
+    tz = ZoneInfo(athlete_timezone(session, user_id))
+    today = today or datetime.now(tz).date()
+    activities = session.scalars(
+        sa.select(Activity)
+        .where(Activity.user_id == user_id)
+        .order_by(Activity.start_at)
+        .execution_options(populate_existing=True)
+    ).all()
+    if not activities:
+        return CurveSimulation([], [], [], [])
+    thresholds = _Thresholds.load(session, user_id)
+    current: defaultdict[date, float] = defaultdict(float)
+    without: defaultdict[date, float] = defaultdict(float)
+    after: defaultdict[date, float] = defaultdict(float)
+    excluded: dict[str, list[float]] = defaultdict(list)
+    for activity in activities:
+        day = _local_day(activity.start_at, tz)
+        stored = float(activity.load) if activity.load is not None else 0.0
+        if _counts_in_curve(activity, overwrite_existing=False):
+            current[day] += stored
+        if _counts_in_curve(activity, overwrite_existing=True):
+            without[day] += stored
+        elif (
+            _counts_in_curve(activity, overwrite_existing=False)
+            and LOAD_RULES[activity.sport].registered_only
+        ):
+            excluded[activity.sport].append(stored)
+        if _keeps_current_load(activity, overwrite_existing=True):
+            new_load = activity.load
+            new_method = activity.load_method
+        else:
+            new_load, new_method, _ = _stored_values(
+                activity, compute_activity_load(activity, thresholds.on(day))
+            )
+        if (
+            activity.duplicate_of_id is None
+            and new_load is not None
+            and counts_in_daily_load(activity.sport, new_method)
+        ):
+            after[day] += float(new_load)
+    start = _local_day(activities[0].start_at, tz)
+    end = max(today, _local_day(activities[-1].start_at, tz))
+    return CurveSimulation(
+        fitness_series(current, start=start, end=end),
+        fitness_series(without, start=start, end=end),
+        fitness_series(after, start=start, end=end),
+        [ExcludedSport(sport, len(loads), sum(loads)) for sport, loads in sorted(excluded.items())],
+    )
 
 
 def _row(user_id: uuid.UUID, day: FitnessDay) -> dict[str, object]:

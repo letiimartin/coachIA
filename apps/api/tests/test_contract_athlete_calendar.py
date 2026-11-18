@@ -113,7 +113,7 @@ INVALID_REQUESTS: list[tuple[str, str, Any]] = [
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01"}),
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "ftp_w": 49}),
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "ftp_w": 701}),
-    ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "lthr_bpm": 231}),
+    ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "cycling_lthr_bpm": 231}),
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "hr_max_bpm": 99}),
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "hr_rest_bpm": 24}),
     ("POST", "/v1/athlete/thresholds", {"effective_from": "2026-11-01", "weight_kg": 251}),

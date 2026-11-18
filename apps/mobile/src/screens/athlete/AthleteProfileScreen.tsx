@@ -108,11 +108,11 @@ function age(birth: string | null): number | null {
 }
 
 /**
- * FC umbral de la tira. Con el contrato de #22 (PR #27) es `running_lthr_bpm`, la referencia de
- * trail; mientras no se fusione, la API sólo tiene `lthr_bpm`.
+ * FC umbral de la tira: `running_lthr_bpm`, la referencia de las zonas de trail (#22). La de
+ * ciclismo sólo se usa para la carga por FC, y la antigua (`legacy_lthr_bpm`) no se muestra aquí.
  */
 function thresholdHr(t: ThresholdOut): number | null {
-  return (t as ThresholdOut & { running_lthr_bpm?: number | null }).running_lthr_bpm ?? t.lthr_bpm;
+  return t.running_lthr_bpm;
 }
 
 function availabilitySummary(week: WeekAvailability): string {

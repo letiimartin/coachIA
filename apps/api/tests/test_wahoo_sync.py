@@ -33,6 +33,7 @@ from app.models import (
     IntegrationStatus,
     LoadMethod,
 )
+from app.services import fitness
 from tests.conftest import (
     FERNET_KEY,
     INTERNAL_KEY,
@@ -275,12 +276,18 @@ def test_sync_computes_load_and_recomputes_the_series(
     )
     assert _daily_load(engine, user_id, date(2015, 8, 12)) == Decimal("2.8")
 
-    # Un sync que modifica la actividad recalcula su carga y la serie desde su fecha.
+    # Un sync que modifica una actividad que ya tiene carga no la cambia (protección de #22):
+    # eso sólo lo hace el recálculo histórico explícito.
     edited = copy.deepcopy(fake_wahoo.pages[1])
     edited["workouts"][1]["workout_summary"]["power_bike_np_last"] = "200.00"
     fake_wahoo.pages[1] = edited
     sync.sync_user(session, cipher, wahoo, user_id)
 
+    assert _activities(engine, user_id)[1].load == Decimal("2.8")
+    assert _daily_load(engine, user_id, date(2015, 8, 12)) == Decimal("2.8")
+
+    fitness.recompute_from(session, user_id, date(2015, 8, 12), overwrite_existing=True)
+    session.commit()
     assert _activities(engine, user_id)[1].load == Decimal("5.0")
     assert _daily_load(engine, user_id, date(2015, 8, 12)) == Decimal("5.0")
 
