@@ -17,7 +17,7 @@ import { todayIsoDate } from '../../ui/dates';
 import { Icon } from '../../ui/Icon';
 import { ENRICHMENT_STATUS_LABELS, EVENT_KIND_LABELS, RACE_DISCIPLINE_LABELS, TRAINING_IMPACT_LABELS } from '../../ui/labels';
 import { StatStrip, type Stat } from '../../ui/StatStrip';
-import { colors, spacing, typography } from '../../ui/theme';
+import { colors, lines, spacing, typography } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EventDetail'>;
@@ -55,14 +55,14 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
   const raceStats: Stat[] = race
     ? [
-        { value: race.distance_m != null ? formatKm(race.distance_m) : '—', label: 'Distancia' },
-        { value: race.ascent_m != null ? formatMeters(race.ascent_m) : '—', label: 'Desnivel positivo' },
+        { value: race.distance_m != null ? formatKm(race.distance_m) : '—', caption: 'Distancia' },
+        { value: race.ascent_m != null ? formatMeters(race.ascent_m) : '—', caption: 'Desnivel positivo' },
       ]
     : [];
   const raceStats2: Stat[] = race
     ? [
-        { value: race.discipline ? RACE_DISCIPLINE_LABELS[race.discipline] : '—', label: 'Disciplina' },
-        { value: race.priority, label: 'Prioridad' },
+        { value: race.discipline ? RACE_DISCIPLINE_LABELS[race.discipline] : '—', caption: 'Disciplina' },
+        { value: race.priority, caption: 'Prioridad' },
       ]
     : [];
 
@@ -89,8 +89,12 @@ export default function EventDetailScreen({ navigation, route }: Props) {
 
       {race ? (
         <View>
-          <StatStrip size="medium" ruled items={raceStats} />
-          <StatStrip size="medium" ruled items={raceStats2} />
+          <View style={local.ruled}>
+            <StatStrip stats={raceStats} />
+          </View>
+          <View style={local.ruled}>
+            <StatStrip stats={raceStats2} />
+          </View>
         </View>
       ) : null}
 
@@ -141,6 +145,7 @@ const local = StyleSheet.create({
   when: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.md },
   whenText: { flexShrink: 1 },
   countdown: { ...typography.smallBold, color: colors.text },
+  ruled: { borderTopWidth: lines.hairline, borderTopColor: colors.separator, paddingVertical: spacing.sm + 2 },
   link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   pressed: { opacity: 0.7 },
   linkText: { flexShrink: 1 },

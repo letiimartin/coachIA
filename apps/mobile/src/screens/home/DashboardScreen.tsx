@@ -10,7 +10,8 @@ import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import { athleteApi, calendarApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
-import type { CalendarEventOut, FitnessDayOut, ProfileOut } from '../../api/types';
+import { fitnessApi, type FitnessDayOut } from '../../api/fitnessApi';
+import type { CalendarEventOut, ProfileOut } from '../../api/types';
 import { AgendaItems } from '../../ui/Agenda';
 import { daysBetween, localDay, longDayLabel, startOfWeek, WEEKDAY_LETTERS, weekDays } from '../../ui/calendarDates';
 import { EVENT_KIND_ICONS, eventsByDay, raceSummary, toAgendaEntry } from '../../ui/calendarEvents';
@@ -44,7 +45,7 @@ async function loadDashboard(): Promise<DashboardData> {
   const today = todayIsoDate();
   const [profile, fitness, events] = await Promise.all([
     section(athleteApi.getProfile()),
-    section(athleteApi.getFitness(today, today).then((s) => s.days[s.days.length - 1] ?? null)),
+    section(fitnessApi.getSeries(today, today).then((s) => s.days[s.days.length - 1] ?? null)),
     // Desde el lunes y durante un año: la semana en curso y el próximo objetivo.
     section(calendarApi.listEvents(startOfWeek(today), addDays(today, 365))),
   ]);
@@ -138,10 +139,11 @@ export default function DashboardScreen({ navigation }: Props) {
             {fitness && !noLoadYet ? (
               <>
                 <StatStrip
-                  items={[
-                    { value: formatLoad(fitness.ctl), label: 'Forma (CTL)' },
-                    { value: formatLoad(fitness.atl), label: 'Fatiga (ATL)' },
-                    { value: formatLoad(fitness.tsb), label: 'Balance (TSB)' },
+                  size="large"
+                  stats={[
+                    { value: formatLoad(fitness.ctl), caption: 'Forma (CTL)' },
+                    { value: formatLoad(fitness.atl), caption: 'Fatiga (ATL)' },
+                    { value: formatLoad(fitness.tsb), caption: 'Balance (TSB)' },
                   ]}
                 />
                 {fitness.day !== today ? <Text style={styles.muted}>Datos del {formatDate(fitness.day)}.</Text> : null}

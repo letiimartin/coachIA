@@ -1,0 +1,54 @@
+name: Automatización (n8n)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "automation/**"
+      - ".github/workflows/automation.yml"
+  pull_request:
+    paths:
+      - "automation/**"
+      - ".github/workflows/automation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: automation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  n8n:
+    name: Workflows de n8n
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tests del comprobador
+        run: python -m unittest discover -s automation/n8n/tests -v
+      - name: Workflows válidos, inactivos y sin secretos ni URLs de producción
+        run: python automation/n8n/n8n_workflows.py check
+      - name: docker-compose válido y con la versión de n8n fijada
+        working-directory: automation/n8n
+        run: |
+          N8N_ENCRYPTION_KEY=ci-placeholder docker compose -f docker-compose.n8n.yml config -q
+          image=$(N8N_ENCRYPTION_KEY=ci-placeholder docker compose -f docker-compose.n8n.yml config --images)
+          echo "Imagen: $image"
+          echo "$image" | grep -Eq ':[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "::error::La imagen de n8n debe llevar una versión fijada (x.y.z), no '$image'."
+            exit 1
+          }
+      - name: .env.example sin valores secretos
+        working-directory: automation/n8n
+        run: |
+          if grep -E '^N8N_ENCRYPTION_KEY=.+' .env.example; then
+            echo "::error::.env.example no puede llevar N8N_ENCRYPTION_KEY."
+            exit 1
+          fi
+          if grep -Eiq 'onrender\.com|supabase\.co' .env.example docker-compose.n8n.yml; then
+            echo "::error::No se permiten URLs de producción en la configuración local de n8n."
+            exit 1
+          fi

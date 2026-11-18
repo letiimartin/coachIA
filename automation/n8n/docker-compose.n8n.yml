@@ -1,0 +1,48 @@
+# n8n local para orquestar la API de CoachIA. Sólo para desarrollo: no es un despliegue.
+#
+#   cp automation/n8n/.env.example automation/n8n/.env   # y rellena N8N_ENCRYPTION_KEY
+#   docker compose -f automation/n8n/docker-compose.n8n.yml --env-file automation/n8n/.env up -d
+#
+# Ver automation/n8n/README.md.
+name: coachia-n8n
+
+services:
+  n8n:
+    # Versión fijada: se actualiza a mano, probando los workflows antes.
+    image: docker.io/n8nio/n8n:2.46.7
+    restart: unless-stopped
+    ports:
+      # Sólo en localhost: el editor de n8n no queda expuesto a la red.
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    extra_hosts:
+      # Permite llegar a la API que corre en el anfitrión (uvicorn) también en Linux.
+      - "host.docker.internal:host-gateway"
+    environment:
+      # URL base de la API que llaman los workflows ({{ $env.API_BASE_URL }}). Por defecto, la API local.
+      API_BASE_URL: ${API_BASE_URL:-http://host.docker.internal:8000}
+      # Los workflows leen API_BASE_URL con $env; n8n 2.x lo bloquea por defecto.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Cifra las credenciales guardadas en el volumen. Obligatoria (no tiene valor por defecto).
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en automation/n8n/.env}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Europe/Madrid}
+      TZ: ${GENERIC_TIMEZONE:-Europe/Madrid}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      # IPv4 explícito: algunos Docker no tienen IPv6 y n8n no arranca escuchando en "::".
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # Conserva las ejecuciones una semana (para revisar errores).
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Workflows del repositorio (sólo lectura), para importarlos con la CLI de n8n.
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n_data:

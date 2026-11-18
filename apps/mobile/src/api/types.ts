@@ -31,9 +31,6 @@ export type RaceDiscipline = S['RaceDiscipline'];
 export type RacePriority = S['RacePriority'];
 export type EnrichmentStatus = S['EnrichmentStatus'];
 
-export type FitnessSeriesOut = S['FitnessSeriesOut'];
-export type FitnessDayOut = S['FitnessDayOut'];
-
 export type ErrorResponse = S['ErrorResponse'];
 
 export type IntegrationOut = S['IntegrationOut'];

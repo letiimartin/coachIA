@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+/**
+ * Pestaña Perfil (propuesta v3, #25): ficha con nombre, deportes y tira de umbrales vigentes, y
+ * secciones de filas con filetes (Entrenamiento, Conexiones y Aplicación). El engranaje abre
+ * Ajustes y conexiones. La edición de los datos personales es la de #20; la zona horaria se
+ * cambia en Ajustes.
+ */
+import React, { useCallback, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import { athleteApi } from '../../api/athleteApi';
-import { errorText } from '../../api/errors';
-import type { ProfileOut, ProfilePatch, Sex, Sport } from '../../api/types';
-import { Button, Section, Chips, Field, InfoRow, Loading, Screen, styles } from '../../ui/components';
-import { formatDate, isValidIsoDate } from '../../ui/dates';
+import { ApiError, errorText } from '../../api/errors';
+import { integrationsApi } from '../../api/integrationsApi';
+import type { CurrentThresholdOut, IntegrationOut, ProfileOut, ProfilePatch, Sex, Sport, ThresholdOut, WeekAvailability } from '../../api/types';
+import { Button, Chips, Field, IconButton, Loading, Screen, Section, styles as base } from '../../ui/components';
+import { formatDate, formatDateTime, formatPace, isValidIsoDate } from '../../ui/dates';
 import { numberToText, parseOptionalNumber } from '../../ui/forms';
 import { options, SEX_LABELS, SPORT_LABELS } from '../../ui/labels';
+import { Row, RowGroup, StatusDot } from '../../ui/Row';
+import { StatStrip } from '../../ui/StatStrip';
+import { spacing } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
+import { zoneModelFor } from '../../ui/zoneModel';
 
 type Props = { navigation: NavigationProp<ParamListBase>; onLogout?: () => void };
 
@@ -18,9 +29,41 @@ type Form = {
   birth_date: string;
   sex: Sex | null;
   height_cm: string;
-  timezone: string;
   sports: Sport[];
 };
+
+type Loaded<T> = { ok: true; value: T } | { ok: false; error: string };
+
+type ProfileData = {
+  profile: ProfileOut;
+  threshold: Loaded<CurrentThresholdOut | null>;
+  integrations: Loaded<IntegrationOut[]>;
+  availability: Loaded<WeekAvailability>;
+};
+
+async function settle<T>(promise: Promise<T>): Promise<Loaded<T>> {
+  try {
+    return { ok: true, value: await promise };
+  } catch (e) {
+    return { ok: false, error: errorText(e) };
+  }
+}
+
+/** El perfil es imprescindible; umbrales, Wahoo y disponibilidad se muestran si cargan. */
+async function loadProfile(): Promise<ProfileData> {
+  const [profile, threshold, integrations, availability] = await Promise.all([
+    athleteApi.getProfile(),
+    settle(
+      athleteApi.getCurrentThreshold().catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 404) return null; // aún sin umbrales
+        throw e;
+      }),
+    ),
+    settle(integrationsApi.list()),
+    settle(athleteApi.getAvailability()),
+  ]);
+  return { profile, threshold, integrations, availability };
+}
 
 function toForm(p: ProfileOut): Form {
   return {
@@ -28,7 +71,6 @@ function toForm(p: ProfileOut): Form {
     birth_date: p.birth_date ?? '',
     sex: p.sex ?? null,
     height_cm: numberToText(p.height_cm),
-    timezone: p.timezone,
     sports: [...p.sports],
   };
 }
@@ -52,30 +94,64 @@ function buildPatch(form: Form, profile: ProfileOut): ProfilePatch | string {
   }
   if (height !== profile.height_cm) patch.height_cm = height === null ? null : Math.round(height * 10) / 10;
 
-  const tz = form.timezone.trim();
-  if (!tz || tz.length > 64) return 'Indica una zona horaria válida (p. ej. Europe/Madrid).';
-  if (tz !== profile.timezone) patch.timezone = tz;
-
   if (form.sports.join() !== profile.sports.join()) patch.sports = form.sports;
   return patch;
 }
 
+/** Años cumplidos a partir de la fecha de nacimiento (dato de la ficha, no una métrica). */
+function age(birth: string | null): number | null {
+  if (!birth) return null;
+  const [y, m, d] = birth.split('-').map(Number);
+  const now = new Date();
+  const years = now.getFullYear() - y - (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d) ? 1 : 0);
+  return years >= 0 ? years : null;
+}
+
+/**
+ * FC umbral de la tira. Con el contrato de #22 (PR #27) es `running_lthr_bpm`, la referencia de
+ * trail; mientras no se fusione, la API sólo tiene `lthr_bpm`.
+ */
+function thresholdHr(t: ThresholdOut): number | null {
+  return (t as ThresholdOut & { running_lthr_bpm?: number | null }).running_lthr_bpm ?? t.lthr_bpm;
+}
+
+function availabilitySummary(week: WeekAvailability): string {
+  const training = week.days.filter((d) => !d.is_preferred_rest && d.max_minutes !== 0);
+  if (training.length === 0) return 'Sin días de entreno';
+  const label = `${training.length} ${training.length === 1 ? 'día' : 'días'}`;
+  if (training.some((d) => d.max_minutes == null)) return `${label} por semana`;
+  const minutes = training.reduce((sum, d) => sum + (d.max_minutes ?? 0), 0);
+  return `${label} · ${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')} h por semana`;
+}
+
+function wahooSummary(wahoo: IntegrationOut | undefined): string {
+  if (!wahoo) return 'Sin conectar';
+  if (wahoo.status === 'revoked') return 'Acceso revocado';
+  if (wahoo.status === 'error') return 'Con errores';
+  return wahoo.last_sync_at ? `Sincronizado ${formatDateTime(wahoo.last_sync_at, false)}` : 'Conectado, sin sincronizar';
+}
+
+const orDash = (v: number | null | undefined, format: (n: number) => string) => (v == null ? '—' : format(v));
+
 export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
-  const { data: profile, setData, loading, error, setError, reload } = useFocusLoad(athleteApi.getProfile);
+  const load = useCallback(loadProfile, []);
+  const { data, setData, loading, error, setError, reload } = useFocusLoad(load);
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
+  const profile = data?.profile ?? null;
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
 
   const save = async () => {
-    if (!form || !profile) return;
-    const patch = buildPatch(form, profile);
+    if (!form || !data) return;
+    const patch = buildPatch(form, data.profile);
     if (typeof patch === 'string') return setError(patch);
     if (Object.keys(patch).length === 0) return setForm(null);
     setSaving(true);
     setError(null);
     try {
-      setData(await athleteApi.updateProfile(patch));
+      const updated = await athleteApi.updateProfile(patch);
+      setData({ ...data, profile: updated });
       setForm(null);
     } catch (e) {
       setError(errorText(e));
@@ -84,18 +160,31 @@ export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
     }
   };
 
+  const current = data?.threshold.ok ? data.threshold.value : null;
+  const t = current?.threshold ?? null;
+  const power = zoneModelFor('cycling');
+  const pace = zoneModelFor('running');
+  const hr = zoneModelFor('trail_running');
+  const wahoo = data?.integrations.ok ? data.integrations.value.find((i) => i.provider === 'wahoo') : undefined;
+  const years = age(profile?.birth_date ?? null);
+  const meta = [profile?.sports.map((s) => SPORT_LABELS[s]).join(' · '), years != null ? `${years} años` : null].filter(Boolean).join(' · ');
+
   return (
-    <Screen error={error} onDismissError={() => setError(null)} title="Perfil" refreshing={loading && !!profile} onRefresh={form ? undefined : reload}>
-      {loading && !profile ? <Loading /> : null}
+    <Screen
+      title={profile?.display_name || 'Perfil'}
+      error={error}
+      onDismissError={() => setError(null)}
+      refreshing={loading && !!data}
+      onRefresh={form ? undefined : reload}
+      right={<IconButton icon="settings" label="Ajustes y conexiones" onPress={() => navigation.navigate('Integrations')} />}
+    >
+      {loading && !data ? <Loading /> : null}
 
       {profile && !form ? (
-        <Section title={profile.display_name || 'Sin nombre'} right={<Button title="Editar" variant="secondary" onPress={() => setForm(toForm(profile))} />}>
-          <InfoRow label="Fecha de nacimiento" value={profile.birth_date ? formatDate(profile.birth_date) : '—'} />
-          <InfoRow label="Sexo" value={profile.sex ? SEX_LABELS[profile.sex] : '—'} />
-          <InfoRow label="Altura" value={profile.height_cm != null ? `${profile.height_cm} cm` : '—'} />
-          <InfoRow label="Zona horaria" value={profile.timezone} />
-          <InfoRow label="Deportes" value={profile.sports.length ? profile.sports.map((s) => SPORT_LABELS[s]).join(', ') : '—'} />
-        </Section>
+        <View style={styles.identity}>
+          <Text style={[base.muted, styles.meta]}>{meta || 'Completa tu perfil'}</Text>
+          <Button title="Editar" variant="text" onPress={() => setForm(toForm(profile))} />
+        </View>
       ) : null}
 
       {form ? (
@@ -104,27 +193,74 @@ export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
           <Field label="Fecha de nacimiento" value={form.birth_date} onChangeText={(v) => set('birth_date', v)} placeholder="AAAA-MM-DD" />
           <Chips label="Sexo" options={options(SEX_LABELS)} value={form.sex} onChange={(v) => set('sex', v)} allowNone />
           <Field label="Altura (cm)" value={form.height_cm} onChangeText={(v) => set('height_cm', v)} keyboardType="decimal-pad" />
-          <Field label="Zona horaria" value={form.timezone} onChangeText={(v) => set('timezone', v)} placeholder="Europe/Madrid" hint="Identificador IANA, p. ej. Europe/Madrid o Atlantic/Canary." />
           <Chips label="Deportes" options={options(SPORT_LABELS)} value={form.sports} onChange={(v) => set('sports', v)} multiple />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
+          <View style={styles.actions}>
+            <View style={styles.action}>
               <Button title="Cancelar" variant="secondary" onPress={() => setForm(null)} disabled={saving} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={styles.action}>
               <Button title="Guardar" onPress={save} loading={saving} />
             </View>
           </View>
         </Section>
       ) : null}
 
-      <Section title="Entrenamiento">
-        <Text style={styles.muted}>Umbrales, zonas y disponibilidad semanal que usa el coach para planificar.</Text>
-        <Button title="Umbrales y zonas" variant="secondary" onPress={() => navigation.navigate('Thresholds')} />
-        <Button title="Disponibilidad semanal" variant="secondary" onPress={() => navigation.navigate('Availability')} />
-        <Button title="Integraciones (Wahoo)" variant="secondary" onPress={() => navigation.navigate('Integrations')} />
-      </Section>
+      {data && !form ? (
+        <View style={styles.thresholds}>
+          {!data.threshold.ok ? <Text style={base.errorInline}>{data.threshold.error}</Text> : null}
+          {data.threshold.ok && !t ? <Text style={base.muted}>Todavía no hay umbrales. Regístralos para calcular tus zonas.</Text> : null}
+          {t && power && pace && hr ? (
+            <>
+              <StatStrip
+                stats={[
+                  { value: orDash(t.ftp_w, power.format), caption: `${power.unit} ${power.thresholdLabel}` },
+                  { value: orDash(t.threshold_pace_s_per_km, formatPace), caption: `${pace.unit} umbral` },
+                  { value: orDash(thresholdHr(t), hr.format), caption: `${hr.unit} umbral` },
+                  { value: orDash(t.weight_kg, (v) => v.toLocaleString('es-ES', { maximumFractionDigits: 1 })), caption: 'kg' },
+                ]}
+              />
+              <Text style={base.muted}>Umbrales vigentes desde el {formatDate(t.effective_from)}</Text>
+            </>
+          ) : null}
+        </View>
+      ) : null}
 
-      {onLogout ? <Button title="Cerrar sesión" variant="danger" onPress={onLogout} /> : null}
+      {data && !form ? (
+        <>
+          <RowGroup title="Entrenamiento">
+            <Row icon="thresholds" title="Umbrales y zonas" subtitle="FTP, ritmo y FC de trail" onPress={() => navigation.navigate('Thresholds')} />
+            <Row
+              icon="availability"
+              title="Disponibilidad"
+              subtitle={data.availability.ok ? availabilitySummary(data.availability.value) : data.availability.error}
+              onPress={() => navigation.navigate('Availability')}
+            />
+          </RowGroup>
+
+          <RowGroup title="Conexiones">
+            <Row
+              icon="sync"
+              title="Wahoo"
+              subtitle={data.integrations.ok ? wahooSummary(wahoo) : data.integrations.error}
+              value={wahoo ? <StatusDot active={wahoo.status === 'active'} /> : undefined}
+              onPress={() => navigation.navigate('Integrations')}
+            />
+          </RowGroup>
+
+          <RowGroup title="Aplicación">
+            <Row icon="timezone" title="Zona horaria" value={data.profile.timezone} onPress={() => navigation.navigate('Integrations')} />
+            {onLogout ? <Row icon="logout" title="Cerrar sesión" danger onPress={onLogout} /> : null}
+          </RowGroup>
+        </>
+      ) : null}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginTop: -spacing.md },
+  meta: { flexShrink: 1 },
+  thresholds: { gap: spacing.sm },
+  actions: { flexDirection: 'row', gap: spacing.sm },
+  action: { flex: 1 },
+});

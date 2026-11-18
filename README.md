@@ -13,7 +13,7 @@ apps/
 legacy/
   render-backend/  FastAPI desplegado en Render: hoy sólo sirve el callback OAuth de Wahoo
   supabase/        Edge Functions y migraciones del MVP (referencia; el esquema v1 se hará con Alembic)
-automation/   Workflows de n8n (próximamente)
+automation/   Workflows de n8n (entorno local, inactivos). Ver automation/n8n/README.md
 data/inbox/   Ficheros locales (FIT, exportaciones). No se versionan
 docs/         Documentación y decisiones de arquitectura
 ```
