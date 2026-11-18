@@ -83,7 +83,10 @@ def curve_report(simulation: fitness.CurveSimulation) -> None:
         f"Curva actual el {last.day}: CTL {last.ctl:.1f}, ATL {last.atl:.1f}, TSB {last.tsb:.1f}."
     )
     for title, deltas in (
-        ("Excluyendo senderismo, natación y otros", simulation.exclusion_deltas),
+        (
+            "Excluyendo la carga histórica (senderismo, natación, otros y TSS de fuerza)",
+            simulation.exclusion_deltas,
+        ),
         ("Con el recálculo completo", simulation.recompute_deltas),
     ):
         peak = _peak(deltas)
@@ -115,7 +118,7 @@ def write_curve_csv(simulation: fitness.CurveSimulation, path: Path) -> None:
         )
         for now, excluding, after in zip(
             simulation.current,
-            simulation.without_registered,
+            simulation.without_historical,
             simulation.after_recompute,
             strict=True,
         ):

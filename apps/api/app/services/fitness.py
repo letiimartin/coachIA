@@ -13,13 +13,15 @@ Criterios:
   `moving_s` o, si no hay, `elapsed_s`.
 - El método de carga va por deporte (`app.metrics.load.LOAD_RULES`) y el LTHR de cada deporte
   sale de `app.metrics.zones.lthr_field_for`.
-- La carga diaria sólo suma resistencia (`counts_in_daily_load`): la fuerza (`strength`, y
-  cualquier carga `session_rpe`) no suma nunca, aunque conserve una carga TSS antigua.
+- La carga diaria sólo suma resistencia (`counts_in_daily_load`). La fuerza (`strength`) se
+  calcula por `session_rpe` y esa carga no suma nunca.
 - Senderismo, natación y otros sólo se registran: no se les calcula carga y las que ya tienen
-  se conservan siempre como dato histórico (tampoco el recálculo explícito las borra). Mientras
-  dure la protección, esas cargas históricas siguen contando en la curva, para que no cambie
-  antes de que la autora apruebe el recálculo; el recálculo explícito ya las excluye, y
-  `simulate_curve` enseña cuánto cambia la curva al excluirlas.
+  se conservan siempre como dato histórico (tampoco el recálculo explícito las borra).
+- Carga histórica (`_is_historical_load`): la carga TSS calculada antes de #22 para deportes que
+  ahora no suman (senderismo, natación, otros y el TSS por FC de la fuerza). Mientras dure la
+  protección, sigue contando en la curva, para que no cambie antes de que la autora apruebe el
+  recálculo; el recálculo explícito la excluye (y en la fuerza la sustituye por `session_rpe` o
+  la deja vacía), y `simulate_curve` enseña cuánto cambia la curva al excluirla.
 - Las actividades marcadas como duplicadas (`duplicate_of_id`) tienen su carga, pero no suman
   en la carga diaria. Las de carga por RPE (manual) no se recalculan.
 
@@ -167,17 +169,30 @@ def _keeps_current_load(activity: Activity, *, overwrite_existing: bool) -> bool
     return activity.load is not None and not overwrite_existing
 
 
+def _is_historical_load(activity: Activity) -> bool:
+    """Carga TSS anterior a #22 de un deporte que ahora no suma en CTL/ATL.
+
+    Es la de senderismo, natación y otros, y el TSS (por FC) de la fuerza. Nunca la carga
+    `session_rpe`, que es de fuerza y no suma nunca.
+    """
+    return (
+        activity.load is not None
+        and not LOAD_RULES[activity.sport].endurance
+        and activity.load_method is not LoadMethod.SESSION_RPE
+    )
+
+
 def _counts_in_curve(activity: Activity, *, overwrite_existing: bool) -> bool:
     """Si la carga guardada de la actividad suma en `daily_load`.
 
-    Con protección (`overwrite_existing` False), la carga histórica de los deportes que sólo se
-    registran sigue sumando como antes; el recálculo explícito la excluye.
+    Con protección (`overwrite_existing` False), la carga histórica (`_is_historical_load`) sigue
+    sumando como antes; el recálculo explícito la excluye.
     """
     if activity.duplicate_of_id is not None or activity.load is None:
         return False
     if counts_in_daily_load(activity.sport, activity.load_method):
         return True
-    return not overwrite_existing and LOAD_RULES[activity.sport].registered_only
+    return not overwrite_existing and _is_historical_load(activity)
 
 
 def _apply_load(activity: Activity, result: LoadResult | None) -> None:
@@ -374,16 +389,16 @@ class ExcludedSport:
 class CurveSimulation:
     """Curva actual frente a dos simulaciones, de la primera actividad a hoy. No escribe nada.
 
-    - `current`: cargas guardadas con la regla de ahora (protección: la carga histórica de los
-      deportes que sólo se registran sigue sumando).
-    - `without_registered`: las mismas cargas, excluyendo esos deportes. Aísla el efecto de
-      excluirlos.
+    - `current`: cargas guardadas con la regla de ahora (protección: la carga histórica sigue
+      sumando: senderismo, natación, otros y el TSS por FC de la fuerza).
+    - `without_historical`: las mismas cargas, sin esa carga histórica. Aísla el efecto de
+      excluirla. `excluded` dice cuánta carga y de qué deportes.
     - `after_recompute`: lo que dejaría el recálculo explícito (cargas recalculadas y
       exclusiones).
     """
 
     current: list[FitnessDay]
-    without_registered: list[FitnessDay]
+    without_historical: list[FitnessDay]
     after_recompute: list[FitnessDay]
     excluded: list[ExcludedSport]
 
@@ -396,7 +411,7 @@ class CurveSimulation:
 
     @property
     def exclusion_deltas(self) -> list[CurveDelta]:
-        return self._deltas(self.current, self.without_registered)
+        return self._deltas(self.current, self.without_historical)
 
     @property
     def recompute_deltas(self) -> list[CurveDelta]:
@@ -406,8 +421,9 @@ class CurveSimulation:
 def simulate_curve(
     session: Session, user_id: uuid.UUID, *, today: date | None = None
 ) -> CurveSimulation:
-    """Cuánto cambiaría la curva al excluir los deportes que sólo se registran, y con el
-    recálculo explícito completo. Calcula desde las actividades; no escribe nada."""
+    """Cuánto cambiaría la curva al excluir la carga histórica (senderismo, natación, otros y el
+    TSS por FC de la fuerza), y con el recálculo explícito completo. Calcula desde las
+    actividades; no escribe nada."""
     tz = ZoneInfo(athlete_timezone(session, user_id))
     today = today or datetime.now(tz).date()
     activities = session.scalars(
@@ -430,10 +446,7 @@ def simulate_curve(
             current[day] += stored
         if _counts_in_curve(activity, overwrite_existing=True):
             without[day] += stored
-        elif (
-            _counts_in_curve(activity, overwrite_existing=False)
-            and LOAD_RULES[activity.sport].registered_only
-        ):
+        elif _counts_in_curve(activity, overwrite_existing=False) and _is_historical_load(activity):
             excluded[activity.sport].append(stored)
         if _keeps_current_load(activity, overwrite_existing=True):
             new_load = activity.load

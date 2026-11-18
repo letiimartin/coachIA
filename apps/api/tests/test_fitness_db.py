@@ -464,7 +464,7 @@ def test_strength_load_is_session_rpe_and_never_counts_in_daily_load(
     assert [float(row[2]) for row in series] == pytest.approx([d.ctl for d in expected], abs=1e-3)
 
 
-def test_old_strength_tss_is_kept_but_not_counted_and_simulation_replaces_it(
+def test_old_strength_tss_counts_until_explicit_recompute(
     session: Session, athlete_id: uuid.UUID
 ) -> None:
     session.add(_threshold(athlete_id, D0, running_lthr_bpm=170))
@@ -472,14 +472,36 @@ def test_old_strength_tss_is_kept_but_not_counted_and_simulation_replaces_it(
     old_no_rpe = _gym(
         athlete_id, D0 + timedelta(days=1), load=Decimal("40.0"), load_method=LoadMethod.HEART_RATE
     )
-    session.add_all([old, old_no_rpe])
+    # Sesión nueva de fuerza: carga por session RPE, que nunca suma.
+    new_gym = _gym(athlete_id, D0 + timedelta(days=2), rpe=8)
+    session.add_all([old, old_no_rpe, new_gym])
     session.commit()
 
-    # Protección: el gancho automático no la borra ni la cambia, pero ya no suma.
+    # Protección: el gancho automático no la borra ni la cambia, y su TSS histórico sigue
+    # contando en la curva hasta el recálculo explícito. La sesión nueva no suma.
     fitness.recompute_from(session, athlete_id, D0, today=TODAY)
     assert (old.load, old.load_method) == (Decimal("50.0"), LoadMethod.HEART_RATE)
-    assert {row[1] for row in _series(session, athlete_id)} == {Decimal("0.0")}
+    assert (new_gym.load, new_gym.load_method) == (Decimal("480.0"), LoadMethod.SESSION_RPE)
+    assert [row[1] for row in _series(session, athlete_id)[:3]] == [
+        Decimal(v) for v in ("50.0", "40.0", "0.0")
+    ]
+    protected_curve = _series(session, athlete_id)
     session.commit()
+
+    # La simulación enseña cuánto cambia la curva al excluir ese TSS, sin escribir nada.
+    simulation = fitness.simulate_curve(session, athlete_id, today=TODAY)
+    assert not session.dirty and not session.new
+    assert [(e.sport, e.activities, e.load) for e in simulation.excluded] == [
+        (Sport.STRENGTH, 2, 90.0)
+    ]
+    with_it = fitness_series({D0: 50.0, D0 + timedelta(days=1): 40.0}, start=D0, end=TODAY)
+    assert [d.ctl for d in simulation.current] == pytest.approx([d.ctl for d in with_it])
+    assert [float(row[2]) for row in protected_curve] == pytest.approx(
+        [d.ctl for d in simulation.current], abs=1e-3
+    )
+    assert {d.ctl for d in simulation.without_historical} == {0.0}
+    assert simulation.exclusion_deltas[-1].ctl == pytest.approx(-with_it[-1].ctl)
+    assert {d.ctl for d in simulation.after_recompute} == {0.0}
 
     changes = fitness.simulate_recompute(session, athlete_id)
     assert [(c.activity_id, c.old_method, c.new_load, c.new_method) for c in changes] == [
@@ -487,6 +509,7 @@ def test_old_strength_tss_is_kept_but_not_counted_and_simulation_replaces_it(
         (old_no_rpe.id, LoadMethod.HEART_RATE, None, None),
     ]
 
+    # Recálculo explícito: el TSS se sustituye por session RPE (o se vacía) y deja de sumar.
     fitness.recompute_from(session, athlete_id, date.min, today=TODAY, overwrite_existing=True)
     assert (old.load, old.load_method) == (Decimal("360.0"), LoadMethod.SESSION_RPE)
     assert (old_no_rpe.load, old_no_rpe.load_method) == (None, None)
@@ -551,7 +574,7 @@ def test_registered_only_sports_get_no_load_and_keep_their_history(
     )
     without_them = fitness_series({D0: 64.0}, start=D0, end=TODAY)
     assert [d.ctl for d in simulation.current] == pytest.approx([d.ctl for d in with_them])
-    assert [d.ctl for d in simulation.without_registered] == pytest.approx(
+    assert [d.ctl for d in simulation.without_historical] == pytest.approx(
         [d.ctl for d in without_them]
     )
     assert simulation.exclusion_deltas[-1].ctl == pytest.approx(
