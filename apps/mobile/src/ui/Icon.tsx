@@ -5,13 +5,17 @@
  */
 import React from 'react';
 import {
+  ArrowUp,
   CalendarDays,
   ChartColumn,
   Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  Clock,
+  FileText,
   Flag,
+  Globe,
   House,
   Link,
   LogOut,
@@ -22,6 +26,7 @@ import {
   Trash2,
   User,
   X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -45,6 +50,12 @@ const ICONS = {
   settings: Settings,
   delete: Trash2,
   logout: LogOut,
+  // Fase 1b (#25): filas de Perfil, Ajustes, Rendimiento y Coach.
+  thresholds: Zap,
+  availability: Clock,
+  timezone: Globe,
+  activities: FileText,
+  send: ArrowUp,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
