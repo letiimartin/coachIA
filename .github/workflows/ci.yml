@@ -87,6 +87,8 @@ jobs:
           }
       - name: Tipos
         run: npm run typecheck
+      - name: Tokens de diseño (sin colores, radios ni fuentes a mano)
+        run: npm run check:tokens
       - name: Generar bundle web
         run: npx expo export --platform web --output-dir dist
         env:

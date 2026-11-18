@@ -1,103 +1,165 @@
+/**
+ * Plan (propuesta v3, #24): semana en agenda (una fila por día) o mes en rejilla con la lista del
+ * día seleccionado debajo. Ambas vistas piden los eventos del rango visible a `GET /v1/calendar/events`.
+ * Aún no hay plan de sesiones en la API: los días muestran sólo eventos.
+ */
 import React, { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
-import { Plus } from 'lucide-react-native';
 
 import { calendarApi } from '../../api/athleteApi';
 import type { CalendarEventOut } from '../../api/types';
-import { Button, Card, Chips, Field, Loading, Screen, styles } from '../../ui/components';
-import { addDays, formatDateTime, isValidIsoDate, todayIsoDate } from '../../ui/dates';
-import { EVENT_KIND_LABELS, RACE_DISCIPLINE_LABELS, TRAINING_IMPACT_LABELS } from '../../ui/labels';
-import { colors } from '../../ui/theme';
+import { Agenda, AgendaItems, type AgendaDay } from '../../ui/Agenda';
+import {
+  addMonths,
+  dayLabel,
+  dayOfMonth,
+  isSameMonth,
+  monthGridDays,
+  monthLabel,
+  startOfMonth,
+  startOfWeek,
+  WEEKDAY_LETTERS,
+  weekDays,
+  weekdayShort,
+  weekRangeLabel,
+} from '../../ui/calendarDates';
+import { eventsByDay, toAgendaEntry } from '../../ui/calendarEvents';
+import { IconButton, Loading, Screen, SegmentedTabs, Section, styles } from '../../ui/components';
+import { addDays, todayIsoDate } from '../../ui/dates';
+import { MonthGrid, type MonthGridDay } from '../../ui/MonthGrid';
+import { PeriodNav } from '../../ui/PeriodNav';
+import { spacing } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
 type Props = { navigation: NavigationProp<ParamListBase> };
 
-type Preset = '30' | '90' | '365' | 'custom';
-const PRESETS: { value: Preset; label: string }[] = [
-  { value: '30', label: '30 días' },
-  { value: '90', label: '3 meses' },
-  { value: '365', label: '1 año' },
-  { value: 'custom', label: 'Otro rango' },
+type View_ = 'week' | 'month';
+const VIEWS: { value: View_; label: string }[] = [
+  { value: 'week', label: 'Semana' },
+  { value: 'month', label: 'Mes' },
 ];
 
-function EventItem({ event, onPress }: { event: CalendarEventOut; onPress: () => void }) {
-  const race = event.race;
-  const raceInfo = race
-    ? [
-        race.discipline ? RACE_DISCIPLINE_LABELS[race.discipline] : null,
-        race.distance_m != null ? `${(race.distance_m / 1000).toLocaleString('es-ES')} km` : null,
-        race.ascent_m != null ? `${race.ascent_m.toLocaleString('es-ES')} m D+` : null,
-        `Prioridad ${race.priority}`,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null;
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-          <Text style={[styles.text, { fontSize: 16, fontWeight: '700', flex: 1 }]}>{event.title}</Text>
-          <Text style={{ color: colors.primary, fontSize: 12 }}>{EVENT_KIND_LABELS[event.kind]}</Text>
-        </View>
-        <Text style={styles.muted}>
-          {formatDateTime(event.start_at, event.all_day)}
-          {event.end_at ? ` → ${formatDateTime(event.end_at, event.all_day)}` : ''}
-        </Text>
-        {raceInfo ? <Text style={styles.text}>{raceInfo}</Text> : null}
-        {event.training_impact !== 'none' ? <Text style={styles.muted}>{TRAINING_IMPACT_LABELS[event.training_impact]}</Text> : null}
-      </Card>
-    </Pressable>
-  );
+function countLabel(n: number): string {
+  if (n === 0) return 'Sin eventos';
+  return n === 1 ? '1 evento' : `${n} eventos`;
 }
 
 export default function EventsScreen({ navigation }: Props) {
-  const [preset, setPreset] = useState<Preset>('90');
-  const [range, setRange] = useState(() => ({ from: todayIsoDate(), to: addDays(todayIsoDate(), 90) }));
-  const [draft, setDraft] = useState(range);
+  const today = todayIsoDate();
+  const [view, setView] = useState<View_>('week');
+  const [monday, setMonday] = useState(() => startOfWeek(today));
+  const [month, setMonth] = useState(() => startOfMonth(today));
+  const [selected, setSelected] = useState(today);
 
-  const load = useCallback(() => calendarApi.listEvents(range.from, range.to), [range]);
+  const days = view === 'week' ? weekDays(monday) : monthGridDays(month);
+  const from = days[0];
+  const to = days[days.length - 1];
+  const load = useCallback(() => calendarApi.listEvents(from, to), [from, to]);
   const { data: events, loading, error, setError, reload } = useFocusLoad(load);
 
-  // Al cambiar el rango cambia `load` y useFocusLoad vuelve a cargar.
-  const applyRange = setRange;
+  const byDay = eventsByDay(events ?? [], days);
+  const openEvent = (id: string) => {
+    const event = events?.find((e) => e.id === id);
+    if (event) navigation.navigate('EventDetail', { event });
+  };
+  const uniqueCount = (list: CalendarEventOut[]) => new Set(list.map((e) => e.id)).size;
 
-  const choosePreset = (p: Preset) => {
-    setPreset(p);
-    if (p !== 'custom') applyRange({ from: todayIsoDate(), to: addDays(todayIsoDate(), Number(p)) });
+  const changeView = (v: View_) => {
+    setView(v);
+    // Cada vista se abre en el periodo del día seleccionado.
+    if (v === 'week') setMonday(startOfWeek(selected));
+    else setMonth(startOfMonth(selected));
   };
 
-  const applyCustom = () => {
-    if (!isValidIsoDate(draft.from) || !isValidIsoDate(draft.to)) return setError('Las fechas deben tener el formato AAAA-MM-DD.');
-    if (draft.to < draft.from) return setError('La fecha final no puede ser anterior a la inicial.');
-    applyRange(draft);
+  const moveMonth = (delta: number) => {
+    const next = addMonths(month, delta);
+    setMonth(next);
+    setSelected(isSameMonth(today, next) ? today : next);
   };
+
+  const moveWeek = (delta: number) => {
+    const next = addDays(monday, delta * 7);
+    setMonday(next);
+    setSelected(weekDays(next).includes(today) ? today : next);
+  };
+
+  const weekEvents = uniqueCount(days.flatMap((d) => byDay[d]));
+  const monthEvents = uniqueCount(days.filter((d) => isSameMonth(d, month)).flatMap((d) => byDay[d]));
+
+  const agendaDays: AgendaDay[] = days.map((date) => ({
+    date,
+    weekday: weekdayShort(date),
+    day: String(dayOfMonth(date)),
+    items: byDay[date].map((e) => toAgendaEntry(e)),
+  }));
+
+  const gridDays: MonthGridDay[] = days.map((date) => {
+    const list = byDay[date];
+    return {
+      date,
+      day: dayOfMonth(date),
+      inMonth: isSameMonth(date, month),
+      marker: list.some((e) => e.kind === 'race') ? 'race' : list.length > 0 ? 'event' : null,
+      accessibilityLabel: `${dayLabel(date)}${date === today ? ', hoy' : ''}: ${countLabel(list.length).toLowerCase()}`,
+    };
+  });
+  const selectedEvents = byDay[selected] ?? [];
 
   return (
     <Screen
-      title="Calendario"
+      title="Plan"
       error={error}
       onDismissError={() => setError(null)}
       refreshing={loading && !!events}
       onRefresh={reload}
-      right={
-        <Pressable onPress={() => navigation.navigate('EventForm', {})} accessibilityRole="button" accessibilityLabel="Nuevo evento">
-          <Plus size={26} color={colors.primary} />
-        </Pressable>
-      }
+      right={<IconButton icon="add" label="Nuevo evento" onPress={() => navigation.navigate('EventForm', {})} />}
     >
-      <Chips options={PRESETS} value={preset} onChange={choosePreset} />
-      {preset === 'custom' ? (
-        <Card>
-          <Field label="Desde" value={draft.from} onChangeText={(v) => setDraft((d) => ({ ...d, from: v }))} placeholder="AAAA-MM-DD" />
-          <Field label="Hasta" value={draft.to} onChangeText={(v) => setDraft((d) => ({ ...d, to: v }))} placeholder="AAAA-MM-DD" />
-          <Button title="Ver eventos" variant="secondary" onPress={applyCustom} />
-        </Card>
-      ) : null}
+      <View style={local.header}>
+        <SegmentedTabs options={VIEWS} value={view} onChange={changeView} />
+        {view === 'week' ? (
+          <PeriodNav
+            label={weekRangeLabel(monday)}
+            caption={events ? countLabel(weekEvents) : undefined}
+            onPrevious={() => moveWeek(-1)}
+            onNext={() => moveWeek(1)}
+            previousLabel="Semana anterior"
+            nextLabel="Semana siguiente"
+          />
+        ) : (
+          <PeriodNav
+            label={monthLabel(month)}
+            caption={events ? countLabel(monthEvents) : undefined}
+            onPrevious={() => moveMonth(-1)}
+            onNext={() => moveMonth(1)}
+            previousLabel="Mes anterior"
+            nextLabel="Mes siguiente"
+          />
+        )}
+      </View>
 
       {loading && !events ? <Loading /> : null}
-      {events && events.length === 0 ? <Text style={styles.muted}>No hay eventos en este rango.</Text> : null}
-      {events?.map((e) => <EventItem key={e.id} event={e} onPress={() => navigation.navigate('EventForm', { event: e })} />)}
+      {events && view === 'week' ? <Agenda days={agendaDays} today={today} emptyText="Sin eventos" onPressItem={openEvent} /> : null}
+      {events && view === 'month' ? (
+        <>
+          <View style={local.bleed}>
+            <MonthGrid weekdayLetters={WEEKDAY_LETTERS} days={gridDays} selected={selected} today={today} onSelect={setSelected} />
+          </View>
+          <Section title={`${dayLabel(selected)}${selected === today ? ' · hoy' : ''}`}>
+            {selectedEvents.length > 0 ? (
+              <AgendaItems items={selectedEvents.map((e) => toAgendaEntry(e))} onPressItem={openEvent} />
+            ) : (
+              <Text style={styles.muted}>Sin eventos este día.</Text>
+            )}
+          </Section>
+        </>
+      ) : null}
     </Screen>
   );
 }
+
+const local = StyleSheet.create({
+  header: { gap: spacing.md, marginTop: -spacing.sm },
+  /** La rejilla ocupa todo el ancho de la columna, sin el margen lateral. */
+  bleed: { marginHorizontal: -spacing.lg, marginTop: -spacing.sm },
+});
