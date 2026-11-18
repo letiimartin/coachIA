@@ -6,12 +6,12 @@ import { Button, PendingFeature, Screen } from '../../ui/components';
 type Props = { navigation: NavigationProp<ParamListBase> };
 
 /**
- * Entrenos. La API todavía no expone el plan ni las actividades sincronizadas (la tabla
+ * Pestaña Rendimiento (por ahora, la antigua pantalla de Entrenos; se recompone en la fase 1). La API todavía no expone el plan ni las actividades sincronizadas (la tabla
  * `activities` existe, pero sin endpoint), así que la pantalla sólo explica qué falta.
  */
 export default function WorkoutsScreen({ navigation }: Props) {
   return (
-    <Screen title="Entrenos" mockBanner={false}>
+    <Screen title="Rendimiento" mockBanner={false}>
       <PendingFeature title="Plan de entrenamiento">
         La generación y consulta del plan semanal todavía no existe en la API. Cuando esté, aquí verás las sesiones planificadas.
       </PendingFeature>

@@ -5,7 +5,7 @@ import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import { athleteApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
 import type { ProfileOut, ProfilePatch, Sex, Sport } from '../../api/types';
-import { Button, Card, Chips, Field, InfoRow, Loading, Screen, styles } from '../../ui/components';
+import { Button, Section, Chips, Field, InfoRow, Loading, Screen, styles } from '../../ui/components';
 import { formatDate, isValidIsoDate } from '../../ui/dates';
 import { numberToText, parseOptionalNumber } from '../../ui/forms';
 import { options, SEX_LABELS, SPORT_LABELS } from '../../ui/labels';
@@ -89,17 +89,17 @@ export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
       {loading && !profile ? <Loading /> : null}
 
       {profile && !form ? (
-        <Card title={profile.display_name || 'Sin nombre'} right={<Button title="Editar" variant="secondary" onPress={() => setForm(toForm(profile))} />}>
+        <Section title={profile.display_name || 'Sin nombre'} right={<Button title="Editar" variant="secondary" onPress={() => setForm(toForm(profile))} />}>
           <InfoRow label="Fecha de nacimiento" value={profile.birth_date ? formatDate(profile.birth_date) : '—'} />
           <InfoRow label="Sexo" value={profile.sex ? SEX_LABELS[profile.sex] : '—'} />
           <InfoRow label="Altura" value={profile.height_cm != null ? `${profile.height_cm} cm` : '—'} />
           <InfoRow label="Zona horaria" value={profile.timezone} />
           <InfoRow label="Deportes" value={profile.sports.length ? profile.sports.map((s) => SPORT_LABELS[s]).join(', ') : '—'} />
-        </Card>
+        </Section>
       ) : null}
 
       {form ? (
-        <Card title="Editar perfil">
+        <Section title="Editar perfil">
           <Field label="Nombre" value={form.display_name} onChangeText={(v) => set('display_name', v)} />
           <Field label="Fecha de nacimiento" value={form.birth_date} onChangeText={(v) => set('birth_date', v)} placeholder="AAAA-MM-DD" />
           <Chips label="Sexo" options={options(SEX_LABELS)} value={form.sex} onChange={(v) => set('sex', v)} allowNone />
@@ -114,15 +114,15 @@ export default function AthleteProfileScreen({ navigation, onLogout }: Props) {
               <Button title="Guardar" onPress={save} loading={saving} />
             </View>
           </View>
-        </Card>
+        </Section>
       ) : null}
 
-      <Card title="Entrenamiento">
+      <Section title="Entrenamiento">
         <Text style={styles.muted}>Umbrales, zonas y disponibilidad semanal que usa el coach para planificar.</Text>
         <Button title="Umbrales y zonas" variant="secondary" onPress={() => navigation.navigate('Thresholds')} />
         <Button title="Disponibilidad semanal" variant="secondary" onPress={() => navigation.navigate('Availability')} />
         <Button title="Integraciones (Wahoo)" variant="secondary" onPress={() => navigation.navigate('Integrations')} />
-      </Card>
+      </Section>
 
       {onLogout ? <Button title="Cerrar sesión" variant="danger" onPress={onLogout} /> : null}
     </Screen>

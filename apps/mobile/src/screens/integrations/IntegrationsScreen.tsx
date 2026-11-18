@@ -6,7 +6,7 @@ import { errorText } from '../../api/errors';
 import { integrationsApi, integrationsAvailable } from '../../api/integrationsApi';
 import type { IntegrationOut } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
-import { Button, Card, InfoRow, Loading, Screen, styles } from '../../ui/components';
+import { Button, Section, InfoRow, Loading, Screen, styles } from '../../ui/components';
 import { confirm } from '../../ui/confirm';
 import { formatDateTime } from '../../ui/dates';
 import { useFocusLoad } from '../../ui/useAsync';
@@ -82,13 +82,13 @@ export default function IntegrationsScreen({ navigation, route }: Props) {
   return (
     <Screen title="Integraciones" onBack={navigation.goBack} error={error} onDismissError={() => setError(null)} refreshing={loading && !!data} onRefresh={reload}>
       {info ? (
-        <Card>
+        <Section>
           <Text style={styles.text}>{info}</Text>
-        </Card>
+        </Section>
       ) : null}
       {loading && !data ? <Loading /> : null}
       {data ? (
-        <Card title="Wahoo">
+        <Section title="Wahoo">
           {!available ? (
             <Text style={styles.muted}>
               Con datos de prueba (EXPO_PUBLIC_API_MOCK=on o sin EXPO_PUBLIC_API_URL) no se puede conectar Wahoo: necesita la API real.
@@ -113,7 +113,7 @@ export default function IntegrationsScreen({ navigation, route }: Props) {
               <Button title="Conectar Wahoo" onPress={connect} loading={busy === 'connect'} disabled={!!busy || !available} />
             </>
           )}
-        </Card>
+        </Section>
       ) : null}
     </Screen>
   );

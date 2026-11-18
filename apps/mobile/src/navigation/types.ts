@@ -7,7 +7,15 @@ export type RootStackParamList = {
   ThresholdForm: { current: ThresholdOut | null };
   Availability: undefined;
   EventForm: { event?: CalendarEventOut };
-  CoachChat: undefined;
   /** Vuelta del OAuth de Wahoo: la API redirige a `…/integrations?provider=wahoo&status=…&reason=…`. */
   Integrations: { provider?: string; status?: string; reason?: string } | undefined;
+};
+
+/** Las cinco pestañas (#23). Coach es una pestaña, no una pantalla de la pila. */
+export type MainTabParamList = {
+  Hoy: undefined;
+  Plan: undefined;
+  Coach: undefined;
+  Rendimiento: undefined;
+  Perfil: undefined;
 };

@@ -6,7 +6,7 @@ import { athleteApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
 import type { AvailabilityDay, PreferredTime, Sport, WeekAvailability } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
-import { Button, Card, Chips, Field, Loading, Screen, styles, SwitchField } from '../../ui/components';
+import { Button, Section, Chips, Field, Loading, Screen, styles, SwitchField } from '../../ui/components';
 import { numberToText, parseOptionalNumber } from '../../ui/forms';
 import { options, PREFERRED_TIME_LABELS, SPORT_LABELS, WEEKDAY_LABELS } from '../../ui/labels';
 import { useFocusLoad } from '../../ui/useAsync';
@@ -89,7 +89,7 @@ export default function AvailabilityScreen({ navigation }: Props) {
         <>
           <Text style={styles.muted}>Tiempo habitual que tienes para entrenar cada día. Deja los minutos vacíos si no hay límite.</Text>
           {days.map((d) => (
-            <Card key={d.weekday} title={WEEKDAY_LABELS[d.weekday]}>
+            <Section key={d.weekday} title={WEEKDAY_LABELS[d.weekday]}>
               <SwitchField label="Descanso preferido" value={d.is_preferred_rest} onValueChange={(v) => update(d.weekday, { is_preferred_rest: v })} />
               <Field
                 label="Minutos disponibles"
@@ -105,7 +105,7 @@ export default function AvailabilityScreen({ navigation }: Props) {
                 onChange={(v) => update(d.weekday, { preferred_time: v })}
               />
               <Chips label="Deportes" options={options(SPORT_LABELS)} value={d.sports} onChange={(v) => update(d.weekday, { sports: v })} multiple />
-            </Card>
+            </Section>
           ))}
           <Button title={saved ? 'Guardado' : 'Guardar semana'} onPress={save} loading={saving} />
         </>

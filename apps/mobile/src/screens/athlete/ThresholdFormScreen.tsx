@@ -6,7 +6,7 @@ import { athleteApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
 import type { ThresholdCreate, ThresholdSource } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
-import { Button, Card, Chips, Field, Screen, styles } from '../../ui/components';
+import { Button, Section, Chips, Field, Screen, styles } from '../../ui/components';
 import { formatPace, isValidIsoDate, parsePace, todayIsoDate } from '../../ui/dates';
 import { numberToText, parseOptionalNumber } from '../../ui/forms';
 import { options, THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
@@ -88,7 +88,7 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
 
   return (
     <Screen error={error} onDismissError={() => setError(null)} title="Nuevo umbral" onBack={navigation.goBack}>
-      <Card>
+      <Section>
         <Text style={styles.muted}>
           {current
             ? 'Precargado con el umbral vigente. Cambia lo que haya variado: los valores que dejes vacíos quedarán sin registrar desde esa fecha.'
@@ -108,7 +108,7 @@ export default function ThresholdFormScreen({ navigation, route }: Props) {
         <Chips label="Origen" options={options(THRESHOLD_SOURCE_LABELS)} value={source} onChange={setSource} />
         <Field label="Notas" value={notes} onChangeText={setNotes} multiline placeholder="Test de 20 min en rodillo…" />
         <Button title="Guardar umbral" onPress={save} loading={saving} />
-      </Card>
+      </Section>
     </Screen>
   );
 }
