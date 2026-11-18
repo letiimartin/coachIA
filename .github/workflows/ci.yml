@@ -64,7 +64,7 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/coachia_test
 
   mobile:
-    name: App móvil (build web)
+    name: App móvil (tipos y build web)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -78,6 +78,15 @@ jobs:
           cache-dependency-path: apps/mobile/package-lock.json
       - name: Instalar dependencias
         run: npm ci
+      - name: Cliente de la API al día con el contrato
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/api || {
+            echo "::error::El cliente de la API está desactualizado. Ejecuta 'npm run gen:api' en apps/mobile y súbelo."
+            exit 1
+          }
+      - name: Tipos
+        run: npm run typecheck
       - name: Generar bundle web
         run: npx expo export --platform web --output-dir dist
         env:
