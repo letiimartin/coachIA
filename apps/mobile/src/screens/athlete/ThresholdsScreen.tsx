@@ -7,10 +7,10 @@ import { ApiError } from '../../api/errors';
 import { useUsingMock } from '../../api/mockStatus';
 import type { CurrentThresholdOut, ThresholdOut, ZoneOut } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
-import { Button, Card, InfoRow, Loading, Screen, styles } from '../../ui/components';
+import { Button, Section, InfoRow, Loading, Screen, styles } from '../../ui/components';
 import { formatDate, formatPace } from '../../ui/dates';
 import { THRESHOLD_SOURCE_LABELS } from '../../ui/labels';
-import { colors } from '../../ui/theme';
+import { colors, lines } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Thresholds'>;
@@ -53,17 +53,17 @@ function ThresholdValues({ t }: { t: ThresholdOut }) {
 function ZonesTable({ title, unit, zones }: { title: string; unit: string; zones: ZoneOut[] | null }) {
   if (!zones) return null;
   return (
-    <Card title={title}>
+    <Section title={title}>
       {zones.map((z) => (
         <View key={z.code} style={{ flexDirection: 'row', gap: 8 }}>
-          <Text style={[styles.text, { width: 40, color: colors.primary, fontWeight: '700' }]}>{z.code}</Text>
+          <Text style={[styles.textActive, { width: 40 }]}>{z.code}</Text>
           <Text style={[styles.text, { flex: 1 }]}>{z.name}</Text>
           <Text style={styles.muted}>
             {z.high == null ? `> ${Math.round(z.low)}` : `${Math.round(z.low)}–${Math.round(z.high)}`} {unit}
           </Text>
         </View>
       ))}
-    </Card>
+    </Section>
   );
 }
 
@@ -83,13 +83,13 @@ export default function ThresholdsScreen({ navigation }: Props) {
           <Button title="Nuevo umbral" onPress={() => navigation.navigate('ThresholdForm', { current: current?.threshold ?? null })} />
 
           {current ? (
-            <Card title={`Vigente desde ${formatDate(current.threshold.effective_from)}`}>
+            <Section title={`Vigente desde ${formatDate(current.threshold.effective_from)}`}>
               <ThresholdValues t={current.threshold} />
-            </Card>
+            </Section>
           ) : (
-            <Card>
+            <Section>
               <Text style={styles.muted}>Todavía no hay umbrales. Registra el primero para calcular tus zonas.</Text>
-            </Card>
+            </Section>
           )}
 
           {current && !hasZones ? (
@@ -104,17 +104,17 @@ export default function ThresholdsScreen({ navigation }: Props) {
           <ZonesTable title="Zonas de FC · carrera" unit="ppm" zones={zones?.hr_running ?? null} />
 
           {data.history.length > 0 ? (
-            <Card title="Histórico">
+            <Section title="Histórico">
               {data.history.map((t) => (
-                <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, gap: 4 }}>
-                  <Text style={[styles.text, { fontWeight: '700' }]}>
+                <View key={t.id} style={{ paddingVertical: 8, borderTopWidth: lines.hairline, borderTopColor: colors.separator, gap: 4 }}>
+                  <Text style={styles.textStrong}>
                     Desde {formatDate(t.effective_from)}
                     {t.id === current?.threshold.id ? ' · vigente' : ''}
                   </Text>
                   <ThresholdValues t={t} />
                 </View>
               ))}
-            </Card>
+            </Section>
           ) : null}
         </>
       ) : null}
