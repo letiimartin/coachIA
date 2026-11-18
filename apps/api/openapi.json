@@ -2524,6 +2524,17 @@
           }
         ],
         "properties": {
+          "accepted_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AcceptAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historial: qué hizo la aceptación (null si no está aceptada)."
+          },
           "activity_id": {
             "format": "uuid",
             "title": "Activity Id",
@@ -2563,6 +2574,18 @@
           },
           "metrics": {
             "$ref": "#/components/schemas/ProposalMetricsOut"
+          },
+          "previous_ftp_w": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Historial: FTP de `test_date` justo antes de aceptar (el de la fila con `update_ftp`, el vigente ese día con `create_row`). Null si no había o si la propuesta no está aceptada.",
+            "title": "Previous Ftp W"
           },
           "proposed_ftp_w": {
             "description": "FTP propuesto: 95 % de la potencia media del bloque.",
@@ -2621,6 +2644,8 @@
           "warnings",
           "decided_at",
           "threshold_id",
+          "accepted_action",
+          "previous_ftp_w",
           "created_at",
           "updated_at"
         ],

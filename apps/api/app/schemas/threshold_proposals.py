@@ -45,6 +45,8 @@ _PROPOSAL_EXAMPLE: dict[str, Any] = {
     ],
     "decided_at": None,
     "threshold_id": None,
+    "accepted_action": None,
+    "previous_ftp_w": None,
     "created_at": "2026-11-15T10:00:00Z",
     "updated_at": "2026-11-15T10:00:00Z",
 }
@@ -145,6 +147,16 @@ class ThresholdProposalOut(BaseModel):
     decided_at: datetime | None
     threshold_id: UUID | None = Field(
         description="Umbral creado o actualizado al aceptar la propuesta."
+    )
+    accepted_action: AcceptAction | None = Field(
+        description="Historial: qué hizo la aceptación (null si no está aceptada)."
+    )
+    previous_ftp_w: int | None = Field(
+        description=(
+            "Historial: FTP de `test_date` justo antes de aceptar (el de la fila con"
+            " `update_ftp`, el vigente ese día con `create_row`). Null si no había o si la"
+            " propuesta no está aceptada."
+        )
     )
     created_at: datetime
     updated_at: datetime

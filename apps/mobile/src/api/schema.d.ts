@@ -1797,6 +1797,8 @@ export interface components {
          *     }
          */
         ThresholdProposalOut: {
+            /** @description Historial: qué hizo la aceptación (null si no está aceptada). */
+            accepted_action: components["schemas"]["AcceptAction"] | null;
             /**
              * Activity Id
              * Format: uuid
@@ -1825,6 +1827,11 @@ export interface components {
              */
             interval_start_at: string;
             metrics: components["schemas"]["ProposalMetricsOut"];
+            /**
+             * Previous Ftp W
+             * @description Historial: FTP de `test_date` justo antes de aceptar (el de la fila con `update_ftp`, el vigente ese día con `create_row`). Null si no había o si la propuesta no está aceptada.
+             */
+            previous_ftp_w: number | null;
             /**
              * Proposed Ftp W
              * @description FTP propuesto: 95 % de la potencia media del bloque.

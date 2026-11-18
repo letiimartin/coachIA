@@ -68,12 +68,23 @@ class ThresholdProposal(TimestampMixin, Base):
     threshold_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("athlete_thresholds.id", ondelete="SET NULL")
     )
+    # Historial de la aceptación (#45), guardado en la misma transacción que cambia el umbral:
+    # qué se hizo y el FTP de `test_date` justo antes (el de la fila con `update_ftp`, el
+    # vigente ese día con `create_row`; null si no había). Sólo historial: nada lo usa.
+    accepted_action: Mapped[AcceptAction | None] = mapped_column(
+        str_enum(AcceptAction, "accept_action")
+    )
+    previous_ftp_w: Mapped[int | None]
 
     __table_args__ = (
         sa.CheckConstraint("proposed_ftp_w BETWEEN 50 AND 700", name="ftp"),
         sa.CheckConstraint("interval_end_at > interval_start_at", name="interval"),
         sa.CheckConstraint("(status = 'pending') = (decided_at IS NULL)", name="decided"),
         sa.CheckConstraint("threshold_id IS NULL OR status = 'accepted'", name="threshold"),
+        sa.CheckConstraint(
+            "(status = 'accepted') = (accepted_action IS NOT NULL)", name="accepted_history"
+        ),
+        sa.CheckConstraint("previous_ftp_w IS NULL OR status = 'accepted'", name="previous_ftp"),
         # Una sola propuesta pendiente por actividad y protocolo.
         sa.Index(
             "uq_threshold_proposals_pending",

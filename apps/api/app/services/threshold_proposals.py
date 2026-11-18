@@ -466,7 +466,8 @@ def accept_proposal(
     `action` y `previous_ftp_w` son los de la vista previa que vio la atleta: si ya no
     coinciden (los umbrales cambiaron entretanto), 409 `preview_outdated` con la vista previa
     nueva en `error.details` y no se guarda nada. 409 también si la propuesta ya no está
-    pendiente. No lanza ningún recálculo histórico.
+    pendiente. Guarda en la propuesta la acción aplicada y el FTP anterior (historial), en la
+    misma transacción que cambia el umbral. No lanza ningún recálculo histórico.
     """
     proposal = _pending_for_update(session, user_id, proposal_id)
     plan = _plan(session, user_id, proposal, lock=True)
@@ -478,6 +479,8 @@ def accept_proposal(
             code="preview_outdated",
             details=preview,
         )
+    # Historial: el FTP de `test_date` leído ahora, con la fila bloqueada, antes de cambiarlo.
+    previous = None if plan.base is None else plan.base.ftp_w
     if plan.row_on_date is None:
         threshold = thresholds.add_threshold(
             session, user_id, threshold_values(proposal, plan.base)
@@ -486,6 +489,9 @@ def accept_proposal(
         threshold = thresholds.update_ftp(
             session, user_id, plan.row_on_date, proposal.proposed_ftp_w, proposal.id
         )
+    # Todo en la misma transacción: el umbral, la propuesta aceptada y su historial.
+    proposal.accepted_action = preview.action
+    proposal.previous_ftp_w = previous
     proposal.status = ProposalStatus.ACCEPTED
     proposal.decided_at = sa.func.now()
     proposal.threshold_id = threshold.id

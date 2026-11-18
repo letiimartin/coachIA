@@ -501,6 +501,8 @@ def test_accept_creates_a_test_threshold_copying_the_current_values(
     ]
     new = rows[1]
     assert str(new.id) == body["threshold_id"]
+    # Historial: create_row y el FTP vigente ese día.
+    assert (body["accepted_action"], body["previous_ftp_w"]) == ("create_row", 220)
     assert new.source == "test"
     assert new.ftp_w == 238
     assert (new.cycling_lthr_bpm, new.running_lthr_bpm) == (165, 172)
@@ -593,6 +595,10 @@ def test_accept_update_ftp_changes_only_the_ftp_of_the_existing_row(
     assert [r.id for r in after] == [r.id for r in before]  # no se crea ninguna fila
     row = after[0]
     assert response.json()["threshold_id"] == str(row.id)
+    # Historial: update_ftp y el FTP que tenía la fila antes de cambiarlo.
+    accepted = response.json()
+    assert (accepted["accepted_action"], accepted["previous_ftp_w"]) == ("update_ftp", 210)
+    assert db_client.get(f"{URL}/{proposal_id}", headers=headers).json() == accepted
     assert row.ftp_w == 238
     assert str(row.ftp_proposal_id) == proposal_id
     # El resto de valores se conservan, incluido el origen.
@@ -606,6 +612,70 @@ def test_accept_update_ftp_changes_only_the_ftp_of_the_existing_row(
         None,
         before[1].updated_at,
     )
+
+
+def test_accept_update_ftp_over_a_row_without_ftp_stores_null_as_previous(
+    db_client: TestClient, headers: Headers, engine: Engine, athlete_id: uuid.UUID
+) -> None:
+    _add_threshold(engine, athlete_id, effective_from=date(2026, 1, 1), ftp_w=200)
+    # Fila del día del test sin FTP (p. ej. sólo peso y FC): el FTP anterior es null, no 200.
+    _add_threshold(engine, athlete_id, effective_from=date(2026, 3, 1), hr_max_bpm=186)
+    proposal_id = _create(db_client, headers, _add_activity(engine, athlete_id)).json()["id"]
+    preview = _preview(db_client, headers, proposal_id).json()
+    assert (preview["action"], preview["previous_ftp_w"]) == ("update_ftp", None)
+
+    response = _accept(db_client, headers, proposal_id)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["accepted_action"], body["previous_ftp_w"]) == ("update_ftp", None)
+    row = _thresholds(engine, athlete_id)[1]
+    assert (row.ftp_w, row.hr_max_bpm) == (238, 186)
+
+
+def test_accept_without_previous_thresholds_stores_create_row_and_null(
+    db_client: TestClient, headers: Headers, engine: Engine, athlete_id: uuid.UUID
+) -> None:
+    proposal_id = _create(db_client, headers, _add_activity(engine, athlete_id)).json()["id"]
+    body = _accept(db_client, headers, proposal_id).json()
+    assert (body["status"], body["accepted_action"], body["previous_ftp_w"]) == (
+        "accepted",
+        "create_row",
+        None,
+    )
+
+
+def test_history_is_rolled_back_with_the_threshold_change(
+    db_client: TestClient,
+    headers: Headers,
+    engine: Engine,
+    athlete_id: uuid.UUID,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _add_threshold(engine, athlete_id, effective_from=date(2026, 3, 1), ftp_w=210)
+    proposal_id = _create(db_client, headers, _add_activity(engine, athlete_id)).json()["id"]
+
+    def failing_hook(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("fallo simulado en el gancho")
+
+    monkeypatch.setattr(fitness, "recompute_from", failing_hook)
+    response = db_client.post(
+        f"{URL}/{proposal_id}/accept",
+        headers=headers,
+        json={"action": "update_ftp", "previous_ftp_w": 210},
+    )
+
+    assert response.status_code == 500
+    # Ni el FTP ni el historial ni el estado: todo o nada.
+    [row] = _thresholds(engine, athlete_id)
+    assert (row.ftp_w, row.ftp_proposal_id) == (210, None)
+    with Session(engine) as session:
+        proposal = session.get_one(ThresholdProposal, uuid.UUID(proposal_id))
+        assert (proposal.status, proposal.accepted_action, proposal.previous_ftp_w) == (
+            "pending",
+            None,
+            None,
+        )
 
 
 @pytest.mark.parametrize(
@@ -642,6 +712,7 @@ def test_accept_with_an_outdated_preview_conflicts_and_saves_nothing(
     ]
     proposal = db_client.get(f"{URL}/{proposal_id}", headers=headers).json()
     assert (proposal["status"], proposal["threshold_id"]) == ("pending", None)
+    assert (proposal["accepted_action"], proposal["previous_ftp_w"]) == (None, None)
 
 
 def test_accept_requires_the_confirmation_body(
@@ -710,6 +781,7 @@ def test_reject_changes_nothing_else(
     assert response.status_code == 200
     assert response.json()["status"] == "rejected"
     assert response.json()["threshold_id"] is None
+    assert (response.json()["accepted_action"], response.json()["previous_ftp_w"]) == (None, None)
     assert [t.ftp_w for t in _thresholds(engine, athlete_id)] == [220]
     assert _preview(db_client, headers, proposal_id).status_code == 409
     accept = {"action": "create_row", "previous_ftp_w": 220}
@@ -774,6 +846,12 @@ def _proposal(user_id: uuid.UUID, activity_id: uuid.UUID, **values: Any) -> Thre
         {"status": "accepted"},  # decidida sin decided_at
         {"decided_at": TEST_START},  # pendiente con decided_at
         {"protocol": "otro"},
+        # aceptada sin historial
+        {"status": "accepted", "decided_at": TEST_START},
+        # historial en una propuesta no aceptada
+        {"status": "rejected", "decided_at": TEST_START, "accepted_action": "update_ftp"},
+        {"previous_ftp_w": 200},
+        {"status": "accepted", "decided_at": TEST_START, "accepted_action": "otra"},
     ],
 )
 def test_check_constraints(engine: Engine, athlete_id: uuid.UUID, values: dict[str, Any]) -> None:
@@ -789,6 +867,16 @@ def test_only_one_pending_proposal_per_activity(engine: Engine, athlete_id: uuid
     with Session(engine) as session:
         session.add(_proposal(athlete_id, activity_id))
         session.add(_proposal(athlete_id, activity_id, status="rejected", decided_at=TEST_START))
+        session.add(
+            _proposal(
+                athlete_id,
+                activity_id,
+                status="accepted",
+                decided_at=TEST_START,
+                accepted_action="update_ftp",
+                previous_ftp_w=None,
+            )
+        )
         session.commit()
         session.add(_proposal(athlete_id, activity_id))
         with pytest.raises(IntegrityError):
