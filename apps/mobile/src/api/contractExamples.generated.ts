@@ -427,6 +427,39 @@ export const contractExamples: Record<string, unknown[]> = {
       "weight_kg": 58.5
     }
   ],
+  "ThresholdProposalCreate": [
+    {
+      "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "protocol": "ftp_20min"
+    }
+  ],
+  "ThresholdProposalOut": [
+    {
+      "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "created_at": "2026-11-15T10:00:00Z",
+      "id": "3f6c1d2e-8a4b-4c7d-9e1f-2a3b4c5d6e7f",
+      "interval_end_at": "2026-11-15T08:35:00Z",
+      "interval_start_at": "2026-11-15T08:15:00Z",
+      "metrics": {
+        "avg_hr_bpm": 168.4,
+        "avg_power_w": 242.3,
+        "duration_s": 1200,
+        "end_offset_s": 2100,
+        "max_hr_bpm": 179,
+        "normalized_power_w": 245.1,
+        "start_offset_s": 900,
+        "valid_data_pct": 100,
+        "variability_index": 1.012,
+        "warmup_s": 900
+      },
+      "proposed_ftp_w": 230,
+      "protocol": "ftp_20min",
+      "status": "pending",
+      "test_date": "2026-11-15",
+      "updated_at": "2026-11-15T10:00:00Z",
+      "warnings": []
+    }
+  ],
   "WeekAvailability": [
     {
       "days": [

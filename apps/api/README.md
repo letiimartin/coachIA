@@ -49,6 +49,10 @@ se cambia con `TEST_DB_PORT`. Para empezar de cero, páralo y borra ese director
 | `GET /v1/integrations` | JWT de Supabase | Estado de las integraciones (nunca devuelve tokens) |
 | `GET /v1/integrations/wahoo/authorize-url?platform=mobile\|web` | JWT de Supabase | URL para autorizar en Wahoo, con `state` firmado |
 | `DELETE /v1/integrations/wahoo` | JWT de Supabase | Desconecta Wahoo y borra los tokens |
+| `POST /v1/athlete/threshold-proposals` | JWT de Supabase | Test de FTP de 20 min: descarga el FIT de una actividad de Wahoo, detecta el bloque y crea una **propuesta** pendiente (no cambia ningún umbral) |
+| `GET /v1/athlete/threshold-proposals[?status=]`, `GET …/{id}` | JWT de Supabase | Propuestas de umbral del atleta |
+| `POST /v1/athlete/threshold-proposals/{id}/accept` | JWT de Supabase | Crea un umbral nuevo (`source = test`) vigente desde el día del test; sin recálculo histórico |
+| `POST /v1/athlete/threshold-proposals/{id}/reject` | JWT de Supabase | Rechaza la propuesta; no toca nada más |
 | `GET /auth/wahoo/callback` | `state` firmado | Redirect URI de Wahoo: canjea el código y vuelve a la app con `?provider=wahoo&status=connected\|error` |
 | `GET /internal/ping` | `X-Internal-API-Key` | Comprobación para n8n (workflows en [`automation/n8n`](../../automation/n8n/README.md)) |
 | `POST /internal/sync/wahoo` | `X-Internal-API-Key` | Sincroniza todas las integraciones de Wahoo activas (n8n, cada 3 h). Idempotente; con el límite de Wahoo responde `rate_limited: true` y el resto sigue en la próxima ejecución |
@@ -70,7 +74,7 @@ uv run alembic upgrade head --sql > migracion.sql         # generar SQL sin cone
 ```
 
 ## Esquema v1 (núcleo)
-Tablas: `athlete_profiles` (1:1 con `auth.users`), `athlete_thresholds` (umbrales con fecha de vigencia), `availability_slots`, `integrations`, `activities`, `calendar_events`, `races` y `daily_load` (carga diaria y CTL/ATL/TSB, derivada: la regenera `services.fitness.recompute_from`). Las zonas no se guardan: se calculan a partir del umbral vigente.
+Tablas: `athlete_profiles` (1:1 con `auth.users`), `athlete_thresholds` (umbrales con fecha de vigencia), `availability_slots`, `integrations`, `activities`, `calendar_events`, `races` `daily_load` (carga diaria y CTL/ATL/TSB, derivada: la regenera `services.fitness.recompute_from`) y `threshold_proposals` (propuestas de umbral salidas de un test, pendientes hasta que la atleta las acepta o rechaza). Las zonas no se guardan: se calculan a partir del umbral vigente.
 
 - RLS está activado en todas las tablas y sin políticas, así que el Data API de Supabase no las expone. La API se conecta como propietaria.
 - Tests de integración: `TEST_DATABASE_URL=postgresql://... uv run pytest`. Usa una BD **desechable**: el test borra los esquemas `public` y `auth`.

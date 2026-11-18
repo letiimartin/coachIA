@@ -6,6 +6,8 @@ Endpoints verificados con la documentación oficial (https://cloud-api.wahooliga
 - GET  {base}/v1/workouts      (page, per_page; ordenados por `starts` descendente)
   Respuesta: {"workouts": [...], "total", "page", "per_page", "order", "sort"}.
 - GET  {base}/v1/workouts/:id/workout_summary  (resultados del workout y `file.url` del FIT)
+- GET  `file.url` del resumen: el FIT del workout. Es una URL del CDN de Wahoo que no necesita
+  el token, así que se descarga sin `Authorization` (el token nunca sale hacia otro host).
 Errores: códigos HTTP (401 token no válido, 429 límite de peticiones, 5xx). Los límites se
 informan en las cabeceras X-RateLimit-*; X-RateLimit-Reset son los segundos hasta el reinicio.
 """
@@ -13,7 +15,7 @@ informan en las cabeceras X-RateLimit-*; X-RateLimit-Reset son los segundos hast
 import logging
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 
@@ -25,6 +27,8 @@ DEFAULT_EXPIRES_IN = 7200
 # La documentación no fija un máximo para per_page; 50 reduce peticiones sin pedir páginas enormes.
 WORKOUTS_PER_PAGE = 50
 API_TIMEOUT_SECONDS = 20
+FIT_TIMEOUT_SECONDS = 60
+FIT_MAX_BYTES = 25 * 1024 * 1024
 
 
 class WahooAuthError(Exception):
@@ -144,6 +148,38 @@ class WahooClient:
         if not isinstance(body, dict):
             raise WahooApiError("Respuesta de workout_summary no válida")
         return body
+
+    def download_fit(self, url: str) -> bytes:
+        """Descarga el FIT de un workout desde `file.url` (bajo demanda, sin guardarlo).
+
+        Sólo HTTPS y sin el token de Wahoo. Nunca se registra la URL (puede llevar firma).
+        WahooNotFoundError si el fichero ya no existe; WahooApiError en el resto de fallos.
+        """
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise WahooApiError("URL del FIT no válida")
+        try:
+            with self._http.stream(
+                "GET", url, timeout=FIT_TIMEOUT_SECONDS, follow_redirects=True
+            ) as response:
+                status = response.status_code
+                if status in (403, 404, 410):
+                    raise WahooNotFoundError("El FIT del workout no está disponible")
+                if status == 429:
+                    raise WahooRateLimitError("Límite de peticiones de Wahoo superado")
+                if status != 200:
+                    logger.warning("Descarga del FIT respondió %s", status)
+                    raise WahooApiError(f"Wahoo respondió {status}")
+                chunks: list[bytes] = []
+                size = 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > FIT_MAX_BYTES:
+                        raise WahooApiError("El FIT es demasiado grande")
+                    chunks.append(chunk)
+        except httpx.HTTPError as exc:
+            raise WahooApiError(f"Error de red con Wahoo: {type(exc).__name__}") from exc
+        return b"".join(chunks)
 
     def _get(self, access_token: str, path: str, params: dict[str, Any] | None = None) -> Any:
         try:

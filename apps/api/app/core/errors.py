@@ -55,6 +55,19 @@ class ConflictError(AppError):
     message = "La operación no es posible en el estado actual."
 
 
+class UnprocessableError(AppError):
+    """La petición es válida pero los datos no permiten completarla. `code` es configurable."""
+
+    status_code = 422
+    code = "unprocessable"
+    message = "No se puede procesar la petición con estos datos."
+
+    def __init__(self, message: str | None = None, *, code: str | None = None):
+        super().__init__(message)
+        if code is not None:
+            self.code = code
+
+
 class TooManyRequestsError(AppError):
     status_code = 429
     code = "too_many_requests"
