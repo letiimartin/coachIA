@@ -35,6 +35,10 @@ def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
         401: "Falta el JWT o no es válido.",
         404: "Recurso no encontrado.",
         409: "Conflicto con el estado actual.",
+        422: "Datos no válidos o que no permiten completar la operación.",
+        429: "Límite de peticiones de un servicio externo.",
+        502: "Un servicio externo no ha respondido correctamente.",
+        503: "Servicio no configurado.",
         501: "Endpoint declarado en el contrato pero todavía sin implementar.",
     }
     codes = sorted({401, 501, *status_codes})

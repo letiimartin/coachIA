@@ -1275,6 +1275,90 @@
         "title": "ProfilePatch",
         "type": "object"
       },
+      "ProposalMetricsOut": {
+        "description": "Métricas del bloque detectado. Offsets en segundos desde el primer registro del FIT.\n\nLa FC (`avg_hr_bpm`, `max_hr_bpm`) es sólo informativa: con este test no se propone FC\numbral. `variability_index` = potencia normalizada / potencia media del bloque.",
+        "properties": {
+          "avg_hr_bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Hr Bpm"
+          },
+          "avg_power_w": {
+            "title": "Avg Power W",
+            "type": "number"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "end_offset_s": {
+            "title": "End Offset S",
+            "type": "integer"
+          },
+          "max_hr_bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Hr Bpm"
+          },
+          "normalized_power_w": {
+            "title": "Normalized Power W",
+            "type": "number"
+          },
+          "start_offset_s": {
+            "title": "Start Offset S",
+            "type": "integer"
+          },
+          "valid_data_pct": {
+            "description": "Porcentaje del bloque con dato de potencia.",
+            "title": "Valid Data Pct",
+            "type": "number"
+          },
+          "variability_index": {
+            "title": "Variability Index",
+            "type": "number"
+          },
+          "warmup_s": {
+            "description": "Segundos registrados antes del bloque.",
+            "title": "Warmup S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start_offset_s",
+          "end_offset_s",
+          "duration_s",
+          "avg_power_w",
+          "normalized_power_w",
+          "variability_index",
+          "avg_hr_bpm",
+          "max_hr_bpm",
+          "valid_data_pct",
+          "warmup_s"
+        ],
+        "title": "ProposalMetricsOut",
+        "type": "object"
+      },
+      "ProposalStatus": {
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected"
+        ],
+        "title": "ProposalStatus",
+        "type": "string"
+      },
       "Provider": {
         "enum": [
           "wahoo",
@@ -1284,6 +1368,35 @@
         ],
         "title": "Provider",
         "type": "string"
+      },
+      "QualityWarningCode": {
+        "enum": [
+          "data_gaps",
+          "pauses",
+          "high_variability",
+          "no_warmup"
+        ],
+        "title": "QualityWarningCode",
+        "type": "string"
+      },
+      "QualityWarningOut": {
+        "description": "Aviso de calidad del test. No impide aceptar la propuesta.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/QualityWarningCode",
+            "description": "`data_gaps`: faltan datos dentro del bloque; `pauses`: tramos a 0 W dentro del bloque; `high_variability`: esfuerzo poco constante; `no_warmup`: sin calentamiento previo suficiente."
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "QualityWarningOut",
+        "type": "object"
       },
       "RaceCreate": {
         "additionalProperties": false,
@@ -2065,6 +2178,171 @@
         ],
         "title": "ThresholdOut",
         "type": "object"
+      },
+      "ThresholdProposalCreate": {
+        "additionalProperties": false,
+        "description": "Analiza el test hecho en una actividad de ciclismo y crea una propuesta pendiente.",
+        "examples": [
+          {
+            "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+            "protocol": "ftp_20min"
+          }
+        ],
+        "properties": {
+          "activity_id": {
+            "format": "uuid",
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ThresholdProtocol",
+            "default": "ftp_20min"
+          }
+        },
+        "required": [
+          "activity_id"
+        ],
+        "title": "ThresholdProposalCreate",
+        "type": "object"
+      },
+      "ThresholdProposalOut": {
+        "description": "Propuesta de umbral salida de un test. Es sólo una propuesta hasta que se acepta.\n\n- `pending`: no cambia ningún umbral.\n- `accepted`: se creó un umbral nuevo (`threshold_id`) vigente desde `test_date`, con\n  `source = test`, el FTP propuesto y el resto de valores copiados del umbral vigente ese\n  día.\n- `rejected`: no se tocó nada.",
+        "examples": [
+          {
+            "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+            "created_at": "2026-11-15T10:00:00Z",
+            "id": "3f6c1d2e-8a4b-4c7d-9e1f-2a3b4c5d6e7f",
+            "interval_end_at": "2026-11-15T08:35:00Z",
+            "interval_start_at": "2026-11-15T08:15:00Z",
+            "metrics": {
+              "avg_hr_bpm": 168.4,
+              "avg_power_w": 242.3,
+              "duration_s": 1200,
+              "end_offset_s": 2100,
+              "max_hr_bpm": 179.0,
+              "normalized_power_w": 245.1,
+              "start_offset_s": 900,
+              "valid_data_pct": 100.0,
+              "variability_index": 1.012,
+              "warmup_s": 900
+            },
+            "proposed_ftp_w": 230,
+            "protocol": "ftp_20min",
+            "status": "pending",
+            "test_date": "2026-11-15",
+            "updated_at": "2026-11-15T10:00:00Z",
+            "warnings": []
+          }
+        ],
+        "properties": {
+          "activity_id": {
+            "format": "uuid",
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "interval_end_at": {
+            "format": "date-time",
+            "title": "Interval End At",
+            "type": "string"
+          },
+          "interval_start_at": {
+            "format": "date-time",
+            "title": "Interval Start At",
+            "type": "string"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/ProposalMetricsOut"
+          },
+          "proposed_ftp_w": {
+            "description": "FTP propuesto: 95 % de la potencia media del bloque.",
+            "title": "Proposed Ftp W",
+            "type": "integer"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/ThresholdProtocol"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "test_date": {
+            "description": "Día local de la actividad: `effective_from` del umbral si se acepta.",
+            "format": "date",
+            "title": "Test Date",
+            "type": "string"
+          },
+          "threshold_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Umbral creado al aceptar la propuesta.",
+            "title": "Threshold Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/QualityWarningOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "activity_id",
+          "protocol",
+          "status",
+          "test_date",
+          "interval_start_at",
+          "interval_end_at",
+          "metrics",
+          "proposed_ftp_w",
+          "warnings",
+          "decided_at",
+          "threshold_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ThresholdProposalOut",
+        "type": "object"
+      },
+      "ThresholdProtocol": {
+        "enum": [
+          "ftp_20min"
+        ],
+        "title": "ThresholdProtocol",
+        "type": "string"
       },
       "ThresholdSource": {
         "enum": [
@@ -2892,6 +3170,458 @@
         "summary": "Update Profile",
         "tags": [
           "athlete"
+        ]
+      }
+    },
+    "/v1/athlete/threshold-proposals": {
+      "get": {
+        "description": "Propuestas del atleta, de la más reciente a la más antigua.",
+        "operationId": "list_proposals_v1_athlete_threshold_proposals_get",
+        "parameters": [
+          {
+            "description": "Filtra por estado.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ProposalStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por estado.",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThresholdProposalOut"
+                  },
+                  "title": "Response List Proposals V1 Athlete Threshold Proposals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Proposals",
+        "tags": [
+          "threshold-proposals"
+        ]
+      },
+      "post": {
+        "description": "Descarga el FIT de la actividad, detecta el test y crea una propuesta **pendiente**.\n\nNo cambia ningún umbral. Errores 422 con `code`: `not_cycling`, `fit_unavailable` (sin\nfichero), `fit_invalid` (dañado o sin registros), `no_power_data`, `test_too_short`,\n`insufficient_data` (demasiados huecos) y `ftp_out_of_range`. 409 si ya hay una propuesta\npendiente de esa actividad.",
+        "operationId": "create_proposal_v1_athlete_threshold_proposals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThresholdProposalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Datos no válidos o que no permiten completar la operación."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Límite de peticiones de un servicio externo."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Un servicio externo no ha respondido correctamente."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Servicio no configurado."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Proposal",
+        "tags": [
+          "threshold-proposals"
+        ]
+      }
+    },
+    "/v1/athlete/threshold-proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_proposal_v1_athlete_threshold_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Proposal",
+        "tags": [
+          "threshold-proposals"
+        ]
+      }
+    },
+    "/v1/athlete/threshold-proposals/{proposal_id}/accept": {
+      "post": {
+        "description": "Acepta la propuesta: crea un umbral nuevo vigente desde `test_date` con `source = test`.\n\nEl umbral nuevo lleva el FTP propuesto y copia el resto de valores del umbral vigente ese\ndía. No fuerza ningún recálculo histórico: sólo se rellena la carga de las actividades que\nno la tienen y se regenera la forma. 409 si la propuesta no está pendiente o si ya hay\numbrales registrados en `test_date`.",
+        "operationId": "accept_proposal_v1_athlete_threshold_proposals__proposal_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Proposal",
+        "tags": [
+          "threshold-proposals"
+        ]
+      }
+    },
+    "/v1/athlete/threshold-proposals/{proposal_id}/reject": {
+      "post": {
+        "description": "Rechaza la propuesta. No cambia ningún umbral. 409 si no está pendiente.",
+        "operationId": "reject_proposal_v1_athlete_threshold_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reject Proposal",
+        "tags": [
+          "threshold-proposals"
         ]
       }
     },

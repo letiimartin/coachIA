@@ -6,6 +6,7 @@ from app.models.calendar import CalendarEvent, EventKind, Race, RacePriority, Tr
 from app.models.common import Sport
 from app.models.fitness import DailyLoad
 from app.models.integration import Integration, IntegrationStatus, Provider
+from app.models.threshold_proposal import ProposalStatus, ThresholdProposal
 
 __all__ = [
     "Activity",
@@ -19,9 +20,11 @@ __all__ = [
     "Integration",
     "IntegrationStatus",
     "LoadMethod",
+    "ProposalStatus",
     "Provider",
     "Race",
     "RacePriority",
     "Sport",
+    "ThresholdProposal",
     "TrainingImpact",
 ]

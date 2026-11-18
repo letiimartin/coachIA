@@ -33,11 +33,23 @@ def list_thresholds(session: Session, user_id: uuid.UUID) -> list[AthleteThresho
 def create_threshold(
     session: Session, user_id: uuid.UUID, values: dict[str, Any]
 ) -> AthleteThreshold:
-    """Registra un juego de umbrales. 409 si ya hay uno con la misma `effective_from`.
+    """Registra un juego de umbrales y hace commit. 409 si ya hay uno con la misma fecha.
+
+    Ver `add_threshold`.
+    """
+    threshold = add_threshold(session, user_id, values)
+    session.commit()
+    session.refresh(threshold)
+    return threshold
+
+
+def add_threshold(session: Session, user_id: uuid.UUID, values: dict[str, Any]) -> AthleteThreshold:
+    """Añade un juego de umbrales sin hacer commit. 409 si ya hay uno con la misma fecha.
 
     En la misma transacción regenera la forma desde `effective_from` y calcula la carga de las
     actividades que aún no la tienen. No cambia la carga de las que ya la tienen (protección de
     #22): eso sólo lo hace el recálculo histórico explícito (`scripts/recompute_loads.py`).
+    En caso de conflicto hace rollback de la transacción entera.
     """
     ensure_athlete_profile(session, user_id)
     exists = session.scalar(
@@ -60,19 +72,22 @@ def create_threshold(
             raise ConflictError(_DUPLICATE_DATE) from exc
         raise
     fitness.recompute_from(session, user_id, threshold.effective_from)
-    session.commit()
-    session.refresh(threshold)
     return threshold
 
 
-def current_threshold(session: Session, user_id: uuid.UUID, on: date) -> AthleteThreshold:
-    """Fila más reciente con `effective_from <= on`. 404 si no hay ninguna."""
-    threshold = session.scalar(
+def threshold_on(session: Session, user_id: uuid.UUID, on: date) -> AthleteThreshold | None:
+    """Fila más reciente con `effective_from <= on`, o None si no hay ninguna."""
+    return session.scalar(
         sa.select(AthleteThreshold)
         .where(AthleteThreshold.user_id == user_id, AthleteThreshold.effective_from <= on)
         .order_by(AthleteThreshold.effective_from.desc())
         .limit(1)
     )
+
+
+def current_threshold(session: Session, user_id: uuid.UUID, on: date) -> AthleteThreshold:
+    """Fila más reciente con `effective_from <= on`. 404 si no hay ninguna."""
+    threshold = threshold_on(session, user_id, on)
     if threshold is None:
         raise NotFoundError("No hay umbrales registrados en esa fecha.")
     return threshold
