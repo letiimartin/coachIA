@@ -1,14 +1,15 @@
 /**
  * Plan (propuesta v3, #24): semana en agenda (una fila por día) o mes en rejilla con la lista del
- * día seleccionado debajo. Ambas vistas piden los eventos del rango visible a `GET /v1/calendar/events`.
- * Aún no hay plan de sesiones en la API: los días muestran sólo eventos.
+ * día seleccionado debajo. Ambas vistas piden el rango visible a `GET /v1/calendar/events` y a
+ * `GET /v1/planned-workouts` (#31): cada día muestra primero sus entrenos y después sus eventos.
  */
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import { calendarApi } from '../../api/athleteApi';
-import type { CalendarEventOut } from '../../api/types';
+import { errorText } from '../../api/errors';
+import type { CalendarEventOut, PlannedWorkoutOut } from '../../api/types';
 import { Agenda, AgendaItems, type AgendaDay } from '../../ui/Agenda';
 import {
   addMonths,
@@ -29,6 +30,7 @@ import { IconButton, Loading, Screen, SegmentedTabs, Section, styles } from '../
 import { addDays, todayIsoDate } from '../../ui/dates';
 import { MonthGrid, type MonthGridDay } from '../../ui/MonthGrid';
 import { PeriodNav } from '../../ui/PeriodNav';
+import { loadPlannedWithSummaries, type PlannedWithSummaries, workoutIdFromKey, workoutsByDay, workoutToAgendaEntry } from '../../ui/plannedWorkouts';
 import { spacing } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 
@@ -40,9 +42,13 @@ const VIEWS: { value: View_; label: string }[] = [
   { value: 'month', label: 'Mes' },
 ];
 
-function countLabel(n: number): string {
-  if (n === 0) return 'Sin eventos';
-  return n === 1 ? '1 evento' : `${n} eventos`;
+/** «2 entrenos · 1 evento», «Sin planes». */
+function countLabel(workouts: number, events: number): string {
+  const parts = [
+    workouts > 0 ? (workouts === 1 ? '1 entreno' : `${workouts} entrenos`) : null,
+    events > 0 ? (events === 1 ? '1 evento' : `${events} eventos`) : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Sin planes';
 }
 
 export default function EventsScreen({ navigation }: Props) {
@@ -55,15 +61,38 @@ export default function EventsScreen({ navigation }: Props) {
   const days = view === 'week' ? weekDays(monday) : monthGridDays(month);
   const from = days[0];
   const to = days[days.length - 1];
-  const load = useCallback(() => calendarApi.listEvents(from, to), [from, to]);
-  const { data: events, loading, error, setError, reload } = useFocusLoad(load);
+  const load = useCallback(
+    () =>
+      Promise.all([
+        calendarApi.listEvents(from, to),
+        // Si fallan los entrenos, los eventos se siguen viendo y el error se muestra aparte.
+        loadPlannedWithSummaries(from, to).then(
+          (planned) => ({ ...planned, plannedError: null as string | null }),
+          (e: unknown): PlannedWithSummaries & { plannedError: string | null } => ({ workouts: [], summaries: {}, plannedError: errorText(e) }),
+        ),
+      ]).then(([events, planned]) => ({ events, ...planned })),
+    [from, to],
+  );
+  const { data, loading, error, setError, reload } = useFocusLoad(load);
+  const events = data?.events ?? null;
+  const summaries = data?.summaries ?? {};
 
   const byDay = eventsByDay(events ?? [], days);
-  const openEvent = (id: string) => {
-    const event = events?.find((e) => e.id === id);
+  const workoutsDay = workoutsByDay(data?.workouts ?? [], days);
+  const openEvent = (key: string) => {
+    const workoutId = workoutIdFromKey(key);
+    if (workoutId) {
+      navigation.navigate('StrengthSession', { id: workoutId });
+      return;
+    }
+    const event = events?.find((e) => e.id === key);
     if (event) navigation.navigate('EventDetail', { event });
   };
-  const uniqueCount = (list: CalendarEventOut[]) => new Set(list.map((e) => e.id)).size;
+  const uniqueCount = (list: { id: string }[]) => new Set(list.map((e) => e.id)).size;
+  const dayItems = (date: string) => [
+    ...workoutsDay[date].map((w: PlannedWorkoutOut) => workoutToAgendaEntry(w, summaries[w.id])),
+    ...byDay[date].map((e: CalendarEventOut) => toAgendaEntry(e)),
+  ];
 
   const changeView = (v: View_) => {
     setView(v);
@@ -84,27 +113,29 @@ export default function EventsScreen({ navigation }: Props) {
     setSelected(weekDays(next).includes(today) ? today : next);
   };
 
-  const weekEvents = uniqueCount(days.flatMap((d) => byDay[d]));
-  const monthEvents = uniqueCount(days.filter((d) => isSameMonth(d, month)).flatMap((d) => byDay[d]));
+  const monthDays = days.filter((d) => isSameMonth(d, month));
+  const weekCount = countLabel(uniqueCount(days.flatMap((d) => workoutsDay[d])), uniqueCount(days.flatMap((d) => byDay[d])));
+  const monthCount = countLabel(uniqueCount(monthDays.flatMap((d) => workoutsDay[d])), uniqueCount(monthDays.flatMap((d) => byDay[d])));
 
   const agendaDays: AgendaDay[] = days.map((date) => ({
     date,
     weekday: weekdayShort(date),
     day: String(dayOfMonth(date)),
-    items: byDay[date].map((e) => toAgendaEntry(e)),
+    items: dayItems(date),
   }));
 
   const gridDays: MonthGridDay[] = days.map((date) => {
     const list = byDay[date];
+    const dayWorkouts = workoutsDay[date];
     return {
       date,
       day: dayOfMonth(date),
       inMonth: isSameMonth(date, month),
-      marker: list.some((e) => e.kind === 'race') ? 'race' : list.length > 0 ? 'event' : null,
-      accessibilityLabel: `${dayLabel(date)}${date === today ? ', hoy' : ''}: ${countLabel(list.length).toLowerCase()}`,
+      marker: list.some((e) => e.kind === 'race') ? 'race' : list.length + dayWorkouts.length > 0 ? 'event' : null,
+      accessibilityLabel: `${dayLabel(date)}${date === today ? ', hoy' : ''}: ${countLabel(dayWorkouts.length, list.length).toLowerCase()}`,
     };
   });
-  const selectedEvents = byDay[selected] ?? [];
+  const selectedItems = byDay[selected] ? dayItems(selected) : [];
 
   return (
     <Screen
@@ -120,7 +151,7 @@ export default function EventsScreen({ navigation }: Props) {
         {view === 'week' ? (
           <PeriodNav
             label={weekRangeLabel(monday)}
-            caption={events ? countLabel(weekEvents) : undefined}
+            caption={events ? weekCount : undefined}
             onPrevious={() => moveWeek(-1)}
             onNext={() => moveWeek(1)}
             previousLabel="Semana anterior"
@@ -129,7 +160,7 @@ export default function EventsScreen({ navigation }: Props) {
         ) : (
           <PeriodNav
             label={monthLabel(month)}
-            caption={events ? countLabel(monthEvents) : undefined}
+            caption={events ? monthCount : undefined}
             onPrevious={() => moveMonth(-1)}
             onNext={() => moveMonth(1)}
             previousLabel="Mes anterior"
@@ -139,17 +170,18 @@ export default function EventsScreen({ navigation }: Props) {
       </View>
 
       {loading && !events ? <Loading /> : null}
-      {events && view === 'week' ? <Agenda days={agendaDays} today={today} emptyText="Sin eventos" onPressItem={openEvent} /> : null}
+      {data?.plannedError ? <Text style={styles.errorInline}>{`No se han podido cargar los entrenos. ${data.plannedError}`}</Text> : null}
+      {events && view === 'week' ? <Agenda days={agendaDays} today={today} emptyText="Sin planes" onPressItem={openEvent} /> : null}
       {events && view === 'month' ? (
         <>
           <View style={local.bleed}>
             <MonthGrid weekdayLetters={WEEKDAY_LETTERS} days={gridDays} selected={selected} today={today} onSelect={setSelected} />
           </View>
           <Section title={`${dayLabel(selected)}${selected === today ? ' · hoy' : ''}`}>
-            {selectedEvents.length > 0 ? (
-              <AgendaItems items={selectedEvents.map((e) => toAgendaEntry(e))} onPressItem={openEvent} />
+            {selectedItems.length > 0 ? (
+              <AgendaItems items={selectedItems} onPressItem={openEvent} />
             ) : (
-              <Text style={styles.muted}>Sin eventos este día.</Text>
+              <Text style={styles.muted}>Nada planificado este día.</Text>
             )}
           </Section>
         </>

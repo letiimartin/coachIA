@@ -28,6 +28,7 @@ import DashboardScreen from './src/screens/home/DashboardScreen';
 import PerformanceScreen from './src/screens/performance/PerformanceScreen';
 import CoachChatScreen from './src/screens/coach/CoachChatScreen';
 import IntegrationsScreen from './src/screens/integrations/IntegrationsScreen';
+import StrengthSessionScreen from './src/screens/strength/StrengthSessionScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -53,6 +54,7 @@ const linking = {
       Availability: 'profile/availability',
       // Vuelta del OAuth de Wahoo (APP_RETURN_URL_* en la API): ?provider=wahoo&status=…&reason=…
       Integrations: 'integrations',
+      StrengthSession: 'plan/strength/:id',
     },
   },
 };
@@ -187,6 +189,7 @@ export default function App() {
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="EventForm" component={EventFormScreen} />
             <Stack.Screen name="Integrations" component={IntegrationsScreen} />
+            <Stack.Screen name="StrengthSession" component={StrengthSessionScreen} />
           </Stack.Navigator>
         ) : (
           <AuthScreen onLogin={() => { }} />

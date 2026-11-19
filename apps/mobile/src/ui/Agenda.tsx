@@ -16,6 +16,10 @@ export type AgendaEntry = {
   icon: IconName;
   /** Elemento destacado (la carrera): icono y título en `textActive`. */
   highlight?: boolean;
+  /** Elemento ya hecho o saltado: título en `textSecondary`. */
+  muted?: boolean;
+  /** Elemento sin pantalla de detalle: no se puede pulsar. */
+  disabled?: boolean;
 };
 
 export type AgendaDay = {
@@ -36,12 +40,13 @@ export function AgendaItems({ items, onPressItem }: ItemsProps) {
     <View style={styles.items}>
       {items.map((item) => {
         const tint = item.highlight ? colors.textActive : colors.textSecondary;
+        const pressable = !!onPressItem && !item.disabled;
         return (
           <Pressable
             key={item.key}
-            onPress={onPressItem ? () => onPressItem(item.key) : undefined}
-            disabled={!onPressItem}
-            accessibilityRole={onPressItem ? 'button' : undefined}
+            onPress={pressable ? () => onPressItem(item.key) : undefined}
+            disabled={!pressable}
+            accessibilityRole={pressable ? 'button' : undefined}
             accessibilityLabel={[item.title, item.subtitle].filter(Boolean).join(', ')}
             style={({ pressed }) => [styles.item, pressed && styles.pressed]}
           >
@@ -49,7 +54,7 @@ export function AgendaItems({ items, onPressItem }: ItemsProps) {
               <Icon name={item.icon} size={16} color={tint} />
             </View>
             <View style={styles.itemText}>
-              <Text style={[styles.itemTitle, item.highlight && styles.highlight]}>{item.title}</Text>
+              <Text style={[styles.itemTitle, item.highlight && styles.highlight, item.muted && styles.muted]}>{item.title}</Text>
               {item.subtitle ? <Text style={styles.itemSubtitle}>{item.subtitle}</Text> : null}
             </View>
           </Pressable>
@@ -106,6 +111,7 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, minWidth: 0, gap: spacing.xxs },
   itemTitle: { ...typography.smallBold, color: colors.text },
   highlight: { color: colors.textActive },
+  muted: { color: colors.textSecondary },
   itemSubtitle: { ...typography.caption, color: colors.textSecondary },
   empty: { ...typography.small, color: colors.textDisabled, flex: 1, paddingTop: spacing.xs },
 });
