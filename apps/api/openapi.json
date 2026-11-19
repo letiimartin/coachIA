@@ -1051,6 +1051,190 @@
         "title": "ExerciseOut",
         "type": "object"
       },
+      "ExerciseProgressOut": {
+        "description": "Historial de un ejercicio: una entrada por sesión completada, de la más antigua a la\nmás reciente. Vacío si nunca se ha hecho.",
+        "examples": [
+          {
+            "exercise": {
+              "aliases": [
+                "Sentadilla con barra",
+                "Back squat"
+              ],
+              "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+              "mode": "reps",
+              "muscle_group": "quadriceps",
+              "name": "Sentadilla trasera",
+              "origin": "system",
+              "slug": "back_squat"
+            },
+            "sessions": [
+              {
+                "activity_id": "1f0e2d3c-4b5a-4968-8776-655443322110",
+                "best_set_reps": 8,
+                "max_weight_kg": 57.5,
+                "performed_on": "2026-10-29",
+                "planned_workout_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                "sets": 3,
+                "total_reps": 24,
+                "volume_kg": 1360.0
+              },
+              {
+                "activity_id": "2e1d3c4b-5a69-4877-8665-544332211009",
+                "best_set_reps": 8,
+                "max_weight_kg": 60.0,
+                "performed_on": "2026-11-05",
+                "planned_workout_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "sets": 3,
+                "total_reps": 24,
+                "volume_kg": 1420.0
+              },
+              {
+                "activity_id": "3d2c4b5a-6978-4866-9554-433221100998",
+                "best_set_reps": 8,
+                "max_weight_kg": 62.5,
+                "performed_on": "2026-11-17",
+                "sets": 3,
+                "total_reps": 24,
+                "volume_kg": 1480.0
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "exercise": {
+            "$ref": "#/components/schemas/ExerciseOut"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/ExerciseSessionOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exercise",
+          "sessions"
+        ],
+        "title": "ExerciseProgressOut",
+        "type": "object"
+      },
+      "ExerciseSessionOut": {
+        "description": "Lo hecho con un ejercicio en una sesión completada. Sólo cuentan las series hechas.\n\n- `max_weight_kg`: peso máximo de sus series (null si ninguna tiene peso).\n- `volume_kg`: suma de repeticiones × peso de cada serie (con series iguales, series ×\n  repeticiones × peso). Null si ninguna serie tiene peso y repeticiones.\n- `best_set_reps`: repeticiones de la mejor serie, la de más peso (a igual peso, la de más\n  repeticiones; sin peso, la de más repeticiones). Null en ejercicios por segundos.\n- `best_set_seconds`: igual, en los ejercicios por segundos.",
+        "properties": {
+          "activity_id": {
+            "format": "uuid",
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "best_set_reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Set Reps"
+          },
+          "best_set_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Set Seconds"
+          },
+          "max_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Weight Kg"
+          },
+          "performed_on": {
+            "description": "Día local de la sesión.",
+            "format": "date",
+            "title": "Performed On",
+            "type": "string"
+          },
+          "planned_workout_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Workout Id"
+          },
+          "sets": {
+            "description": "Series hechas.",
+            "minimum": 1.0,
+            "title": "Sets",
+            "type": "integer"
+          },
+          "total_reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Repeticiones de todas las series.",
+            "title": "Total Reps"
+          },
+          "total_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Segundos de todas las series.",
+            "title": "Total Seconds"
+          },
+          "volume_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Kg"
+          }
+        },
+        "required": [
+          "performed_on",
+          "activity_id",
+          "planned_workout_id",
+          "sets",
+          "total_reps",
+          "total_seconds",
+          "max_weight_kg",
+          "volume_kg",
+          "best_set_reps",
+          "best_set_seconds"
+        ],
+        "title": "ExerciseSessionOut",
+        "type": "object"
+      },
       "FitnessDayOut": {
         "description": "Un día de la serie. Valores redondeados a 1 decimal.\n\n- `load`: carga total del día (suma del TSS/hrTSS/rTSS de sus actividades, sin duplicados).\n- `ctl`: forma física (media exponencial de 42 días) al final del día.\n- `atl`: fatiga (media exponencial de 7 días) al final del día.\n- `tsb`: frescura con la que se empieza el día: CTL − ATL **del día anterior**\n  (criterio de TrainingPeaks).",
         "properties": {
@@ -1467,6 +1651,70 @@
           "ftp_w"
         ],
         "title": "NextThresholdOut",
+        "type": "object"
+      },
+      "PerformedExerciseOut": {
+        "description": "Un ejercicio con series hechas en sesiones completadas.\n\n`last_max_weight_kg` es el peso máximo de la última sesión (null si no se usó peso).",
+        "examples": [
+          {
+            "exercise": {
+              "aliases": [
+                "Sentadilla con barra",
+                "Back squat"
+              ],
+              "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+              "mode": "reps",
+              "muscle_group": "quadriceps",
+              "name": "Sentadilla trasera",
+              "origin": "system",
+              "slug": "back_squat"
+            },
+            "first_performed_on": "2026-10-29",
+            "last_max_weight_kg": 62.5,
+            "last_performed_on": "2026-11-17",
+            "sessions": 3
+          }
+        ],
+        "properties": {
+          "exercise": {
+            "$ref": "#/components/schemas/ExerciseOut"
+          },
+          "first_performed_on": {
+            "format": "date",
+            "title": "First Performed On",
+            "type": "string"
+          },
+          "last_max_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Max Weight Kg"
+          },
+          "last_performed_on": {
+            "format": "date",
+            "title": "Last Performed On",
+            "type": "string"
+          },
+          "sessions": {
+            "description": "Sesiones completadas con el ejercicio.",
+            "minimum": 1.0,
+            "title": "Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "exercise",
+          "sessions",
+          "first_performed_on",
+          "last_performed_on",
+          "last_max_weight_kg"
+        ],
+        "title": "PerformedExerciseOut",
         "type": "object"
       },
       "PingResponse": {
@@ -2894,6 +3142,111 @@
           "sets"
         ],
         "title": "StrengthSetsPut",
+        "type": "object"
+      },
+      "StrengthWeekOut": {
+        "description": "Una semana (de lunes a domingo, días locales del atleta).\n\n- `sessions`: actividades de fuerza de la semana (sin duplicados).\n- `duration_s`: suma de su duración.\n- `load`: suma de su carga `session_rpe` (minutos × RPE, Foster), redondeada a 1 decimal.\n  Es la carga de fuerza: **no** es TSS y no suma en CTL/ATL/TSB.\n- `sessions_without_load`: sesiones sin RPE, que cuentan en `sessions` y `duration_s`\n  pero no en `load`.",
+        "properties": {
+          "duration_s": {
+            "minimum": 0.0,
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "load": {
+            "minimum": 0.0,
+            "title": "Load",
+            "type": "number"
+          },
+          "sessions": {
+            "minimum": 0.0,
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "sessions_without_load": {
+            "minimum": 0.0,
+            "title": "Sessions Without Load",
+            "type": "integer"
+          },
+          "week_start": {
+            "description": "Lunes de la semana.",
+            "format": "date",
+            "title": "Week Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week_start",
+          "sessions",
+          "duration_s",
+          "load",
+          "sessions_without_load"
+        ],
+        "title": "StrengthWeekOut",
+        "type": "object"
+      },
+      "StrengthWeeklyOut": {
+        "description": "Una semana por cada lunes desde la semana de `from` hasta la de `to`, por fecha.\n\nLas semanas sin fuerza aparecen con todo a 0. La última semana es la que contiene `to`\n(con `to` = hoy, la semana en curso).",
+        "examples": [
+          {
+            "from": "2026-10-26",
+            "to": "2026-11-19",
+            "weeks": [
+              {
+                "duration_s": 2700,
+                "load": 270.0,
+                "sessions": 1,
+                "sessions_without_load": 0,
+                "week_start": "2026-10-26"
+              },
+              {
+                "duration_s": 5400,
+                "load": 495.0,
+                "sessions": 2,
+                "sessions_without_load": 0,
+                "week_start": "2026-11-02"
+              },
+              {
+                "duration_s": 0,
+                "load": 0.0,
+                "sessions": 0,
+                "sessions_without_load": 0,
+                "week_start": "2026-11-09"
+              },
+              {
+                "duration_s": 5100,
+                "load": 330.0,
+                "sessions": 2,
+                "sessions_without_load": 1,
+                "week_start": "2026-11-16"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/StrengthWeekOut"
+            },
+            "title": "Weeks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "weeks"
+        ],
+        "title": "StrengthWeeklyOut",
         "type": "object"
       },
       "StrengthWorkoutComplete": {
@@ -6249,6 +6602,219 @@
           }
         ],
         "summary": "Exercise Last Log",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/exercises/{exercise_id}/progress": {
+      "get": {
+        "description": "Progresión de un ejercicio: una entrada por sesión completada, por fecha.\n\nPor sesión: series hechas, repeticiones o segundos totales, peso máximo, volumen (suma de\nrepeticiones × peso) y repeticiones (o segundos) de la mejor serie. Sólo cuentan las\nseries hechas (`completed`) de sesiones completadas. 404 si el ejercicio no existe.",
+        "operationId": "exercise_progress_v1_strength_exercises__exercise_id__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exercise_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exercise Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exercise Progress",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/progress": {
+      "get": {
+        "description": "Ejercicios hechos en sesiones completadas, del último hecho al más antiguo.\n\nCada uno con su número de sesiones, la primera y la última fecha y el peso máximo de la\núltima sesión. Vacía si todavía no se ha completado ninguna sesión con series.",
+        "operationId": "performed_exercises_v1_strength_progress_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PerformedExerciseOut"
+                  },
+                  "title": "Response Performed Exercises V1 Strength Progress Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Performed Exercises",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/weekly": {
+      "get": {
+        "description": "Resumen semanal de fuerza: sesiones, duración y carga `session_rpe` de cada semana.\n\nUna semana (de lunes a domingo, días locales) por cada lunes desde la semana de `from`\nhasta la de `to` (rango máximo de 366 días), con 0 en las semanas sin fuerza. Es una\ncarga distinta de la de resistencia: no suma en `GET /v1/athlete/fitness`.",
+        "operationId": "strength_weekly_v1_strength_weekly_get",
+        "parameters": [
+          {
+            "description": "Primer día del rango (incluido).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "Primer día del rango (incluido).",
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Último día del rango (incluido).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "Último día del rango (incluido).",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthWeeklyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Strength Weekly",
         "tags": [
           "strength"
         ]
