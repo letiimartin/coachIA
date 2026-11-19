@@ -11,6 +11,10 @@ Campos según la documentación oficial (https://cloud-api.wahooligan.com):
 La documentación no incluye FC máxima, así que `max_hr` queda vacío. Sólo se rellenan datos
 brutos: `load`, `load_method` e `intensity_factor` los calcula el motor de métricas, por lo que
 `power_bike_tss_last` no se usa (queda en `raw`).
+
+Fuerza (#32): Wahoo no tiene un tipo de fuerza. Sólo `WORKOUT` (42, familia GYM) se mapea a
+`strength`. De una actividad de fuerza se guarda sólo lo que llega (duración, FC, calorías):
+Wahoo no da ejercicios, series, pesos ni RPE, así que su carga `session_rpe` queda vacía.
 """
 
 from dataclasses import dataclass
@@ -63,7 +67,10 @@ WORKOUT_TYPES: dict[int, tuple[Sport, str]] = {
     39: (Sport.OTHER, "rowing"),
     40: (Sport.OTHER, "kiteboarding"),
     41: (Sport.OTHER, "stand_up_paddle_board"),
-    42: (Sport.OTHER, "workout"),
+    # WORKOUT (familia GYM): la sesión de gimnasio genérica, la única que puede ser de fuerza.
+    # La documentación no tiene ningún tipo de fuerza propio; el resto de la familia GYM
+    # (elíptica, remo, clase de cardio, escaladora, yoga) y los `fe_*` no son fuerza.
+    42: (Sport.STRENGTH, "workout"),
     43: (Sport.OTHER, "cardio_class"),
     44: (Sport.OTHER, "stair_climber"),
     45: (Sport.OTHER, "wheelchair"),

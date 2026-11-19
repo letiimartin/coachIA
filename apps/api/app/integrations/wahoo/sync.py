@@ -7,6 +7,8 @@
 - `integrations.sync_cursor` guarda el inicio más reciente importado. Los syncs siguientes paran
   al llegar a workouts que empezaron antes de ese inicio menos un margen (`INCREMENTAL_OVERLAP`),
   para recoger también workouts subidos o editados con retraso.
+- Las sesiones de fuerza creadas o modificadas se enlazan con la registrada en la app si es la
+  misma sesión (`services.strength_dedup`, #32), antes de recalcular.
 - Al terminar, recalcula la carga y la forma (`services.fitness.recompute_from`) desde el día
   de la actividad más antigua creada o modificada (backfill incluido); si no cambió nada, sólo
   completa la serie hasta hoy.
@@ -40,8 +42,8 @@ from app.integrations.wahoo.mapper import (
     map_workout,
     parse_datetime,
 )
-from app.models import Activity, ActivitySource, Integration, IntegrationStatus, Provider
-from app.services import fitness
+from app.models import Activity, ActivitySource, Integration, IntegrationStatus, Provider, Sport
+from app.services import fitness, strength_dedup
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +96,7 @@ def sync_user(
     result = SyncResult()
     latest = previous_latest
     earliest_changed: datetime | None = None
+    strength_changed: list[datetime] = []
 
     try:
         page = 1
@@ -120,6 +123,8 @@ def sync_user(
                     earliest_changed is None or start_at < earliest_changed
                 ):
                     earliest_changed = start_at
+                if outcome != "unchanged" and mapped.values["sport"] == Sport.STRENGTH:
+                    strength_changed.append(start_at)
                 latest = start_at if latest is None else max(latest, start_at)
             session.commit()  # Lo importado se conserva aunque falle una página posterior.
 
@@ -139,6 +144,7 @@ def sync_user(
         _record_error(session, integration, str(exc), status=None)
         raise
 
+    strength_dedup.link_strength_sessions(session, user_id, strength_changed)
     if earliest_changed is not None:
         fitness.recompute_since_activity(session, user_id, earliest_changed)
     else:

@@ -38,7 +38,7 @@ from app.models import (
     StrengthSetLog,
 )
 from app.schemas.strength import StrengthSetIn
-from app.services import fitness
+from app.services import fitness, strength_dedup
 from app.services.athletes import athlete_timezone, ensure_athlete_profile
 
 SEARCH_LIMIT = 50
@@ -394,10 +394,11 @@ def complete_workout(
 ) -> StrengthWorkoutDetail:
     """Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.
 
-    En la misma transacción: crea la `activity` (`sport = strength`, `source = manual`,
-    duración y `rpe`), le asigna las series registradas, marca el entreno `done` con su
-    `activity_id` y calcula la carga `session_rpe` con el gancho normal (que regenera la forma
-    desde ese día; la fuerza no suma en CTL/ATL/TSB). 409 si ya está hecho o saltado.
+        En la misma transacción: crea la `activity` (`sport = strength`, `source = manual`,
+        duración y `rpe`), le asigna las series registradas, marca el entreno `done` con su
+        `activity_id` y calcula la carga `session_rpe` con el gancho normal (que regenera la forma
+        desde ese día; la fuerza no suma en CTL/ATL/TSB). Si Wahoo ya grabó la misma sesión, la
+    enlaza (`services.strength_dedup`). 409 si ya está hecho o saltado.
     """
     workout = _strength_workout(session, user_id, workout_id, for_update=True)
     if workout.status != PlannedWorkoutStatus.PLANNED:
@@ -425,6 +426,8 @@ def complete_workout(
     workout.activity_id = activity.id
     workout.updated_at = sa.func.now()
     session.flush()
+    # Si Wahoo ya grabó esta sesión, se enlaza y se toman su duración y su FC (#32).
+    strength_dedup.link_strength_sessions(session, user_id, [started_at])
     fitness.recompute_since_activity(session, user_id, started_at)
     session.commit()
     session.refresh(workout)
