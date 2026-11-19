@@ -10,6 +10,8 @@ export type RootStackParamList = {
   EventDetail: { event: CalendarEventOut };
   /** Vuelta del OAuth de Wahoo: la API redirige a `…/integrations?provider=wahoo&status=…&reason=…`. */
   Integrations: { provider?: string; status?: string; reason?: string } | undefined;
+  /** Sesión de fuerza planificada (`planned_workouts.id`). */
+  StrengthSession: { id: string };
 };
 
 /** Las cinco pestañas (#23). Coach es una pestaña, no una pantalla de la pila. */

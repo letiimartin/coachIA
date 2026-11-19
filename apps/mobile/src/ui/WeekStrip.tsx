@@ -1,6 +1,6 @@
 /**
  * Semana compacta de lunes a domingo para Hoy: una columna por día con su marca (icono del primer
- * evento o un filete si no hay ninguno). Hoy, en `textActive` y subrayado. Sin estado.
+ * entreno o evento, o un filete si no hay nada). Hoy, en `textActive` y subrayado. Sin estado.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -13,10 +13,10 @@ export type WeekStripDay = {
   /** «L». */
   letter: string;
   day: number;
-  /** Icono del evento del día (la carrera manda) o null si no hay ninguno. */
+  /** Icono del día (la carrera manda; después el entreno y el evento) o null si no hay nada. */
   icon: IconName | null;
   highlight?: boolean;
-  /** Eventos del día, para lectores de pantalla. */
+  /** Entrenos y eventos del día, para lectores de pantalla. */
   count: number;
 };
 
@@ -30,7 +30,7 @@ export function WeekStrip({ days, today }: { days: WeekStripDay[]; today: string
             key={d.date}
             style={[styles.col, isToday && styles.todayCol]}
             accessible
-            accessibilityLabel={`${isToday ? 'Hoy, ' : ''}${d.letter} ${d.day}: ${d.count === 0 ? 'sin eventos' : d.count === 1 ? '1 evento' : `${d.count} eventos`}`}
+            accessibilityLabel={`${isToday ? 'Hoy, ' : ''}${d.letter} ${d.day}: ${d.count === 0 ? 'nada planificado' : d.count === 1 ? '1 elemento' : `${d.count} elementos`}`}
           >
             <View style={styles.mark}>
               {d.icon ? <Icon name={d.icon} size={18} color={d.highlight ? colors.textActive : colors.textSecondary} /> : <View style={styles.empty} />}

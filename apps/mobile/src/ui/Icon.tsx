@@ -31,6 +31,8 @@ import {
 } from 'lucide-react-native';
 // Tipos de evento y detalle (fase 1a, #24).
 import { CalendarX2, ExternalLink, HeartPulse, Plane, UserRound, Users } from 'lucide-react-native';
+// Entrenos planificados y sesión de fuerza (Fuerza 2, #31).
+import { Activity, Bike, Dumbbell, Footprints, History, Mountain, Square, SquareCheck, Waves } from 'lucide-react-native';
 
 import { colors } from './theme';
 
@@ -64,6 +66,16 @@ const ICONS = {
   timezone: Globe,
   activities: FileText,
   send: ArrowUp,
+  // Fuerza 2 (#31): disciplinas de los entrenos planificados y registro de series.
+  sportStrength: Dumbbell,
+  sportCycling: Bike,
+  sportRunning: Footprints,
+  sportTrail: Mountain,
+  sportSwimming: Waves,
+  sportOther: Activity,
+  setPending: Square,
+  setDone: SquareCheck,
+  lastLog: History,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

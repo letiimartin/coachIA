@@ -1,7 +1,7 @@
 /**
  * Hoy (propuesta v3, #24): saludo y fecha, el entreno del día en la superficie destacada, la forma
- * (CTL/ATL/TSB de la API), la semana con sus eventos y la cuenta atrás al próximo objetivo.
- * Sólo datos reales: lo que aún no tiene endpoint (el plan de sesiones) se dice tal cual.
+ * (CTL/ATL/TSB de la API), la semana con sus entrenos y eventos y la cuenta atrás al próximo objetivo.
+ * Los entrenos vienen de `GET /v1/planned-workouts` (#31); la fuerza abre su sesión.
  * Cada bloque se carga por separado: un fallo en uno no bloquea el resto.
  */
 import React, { useCallback } from 'react';
@@ -12,12 +12,23 @@ import { athleteApi, calendarApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
 import { fitnessApi, type FitnessDayOut } from '../../api/fitnessApi';
 import type { CalendarEventOut, ProfileOut } from '../../api/types';
-import { AgendaItems } from '../../ui/Agenda';
+import { AgendaItems, type AgendaEntry } from '../../ui/Agenda';
 import { daysBetween, localDay, longDayLabel, startOfWeek, WEEKDAY_LETTERS, weekDays } from '../../ui/calendarDates';
 import { EVENT_KIND_ICONS, eventsByDay, raceSummary, toAgendaEntry } from '../../ui/calendarEvents';
 import { Button, Card, Loading, Screen, Section, styles } from '../../ui/components';
 import { addDays, formatDate, todayIsoDate } from '../../ui/dates';
 import { StatStrip } from '../../ui/StatStrip';
+import {
+  hasSessionScreen,
+  loadPlannedWithSummaries,
+  SPORT_ICONS,
+  workoutIdFromKey,
+  workoutsByDay,
+  workoutSummary,
+  workoutToAgendaEntry,
+  type PlannedWithSummaries,
+} from '../../ui/plannedWorkouts';
+import { SPORT_LABELS } from '../../ui/labels';
 import { colors, lines, spacing, typography } from '../../ui/theme';
 import { useFocusLoad } from '../../ui/useAsync';
 import { WeekStrip, type WeekStripDay } from '../../ui/WeekStrip';
@@ -31,6 +42,7 @@ type DashboardData = {
   profile: Loaded<ProfileOut>;
   fitness: Loaded<FitnessDayOut | null>;
   events: Loaded<CalendarEventOut[]>;
+  workouts: Loaded<PlannedWithSummaries>;
 };
 
 async function section<T>(promise: Promise<T>): Promise<Loaded<T>> {
@@ -43,13 +55,15 @@ async function section<T>(promise: Promise<T>): Promise<Loaded<T>> {
 
 async function loadDashboard(): Promise<DashboardData> {
   const today = todayIsoDate();
-  const [profile, fitness, events] = await Promise.all([
+  const monday = startOfWeek(today);
+  const [profile, fitness, events, workouts] = await Promise.all([
     section(athleteApi.getProfile()),
     section(fitnessApi.getSeries(today, today).then((s) => s.days[s.days.length - 1] ?? null)),
     // Desde el lunes y durante un año: la semana en curso y el próximo objetivo.
-    section(calendarApi.listEvents(startOfWeek(today), addDays(today, 365))),
+    section(calendarApi.listEvents(monday, addDays(today, 365))),
+    section(loadPlannedWithSummaries(monday, addDays(monday, 6))),
   ]);
-  return { today, profile, fitness, events };
+  return { today, profile, fitness, events, workouts };
 }
 
 function greeting(): string {
@@ -76,28 +90,51 @@ export default function DashboardScreen({ navigation }: Props) {
   const today = data?.today ?? todayIsoDate();
   const profile = data?.profile.ok ? data.profile.value : null;
   const events = data?.events.ok ? data.events.value : [];
-  const openEvent = (id: string) => {
-    const event = events.find((e) => e.id === id);
+  const workouts = data?.workouts.ok ? data.workouts.value.workouts : [];
+  const summaries = data?.workouts.ok ? data.workouts.value.summaries : {};
+  const openEvent = (key: string) => {
+    const workoutId = workoutIdFromKey(key);
+    if (workoutId) {
+      navigation.navigate('StrengthSession', { id: workoutId });
+      return;
+    }
+    const event = events.find((e) => e.id === key);
     if (event) navigation.navigate('EventDetail', { event });
   };
 
   const week = weekDays(startOfWeek(today));
   const byDay = eventsByDay(events, week);
+  const workoutsDay = workoutsByDay(workouts, week);
   const weekStrip: WeekStripDay[] = week.map((date, i) => {
     const dayEvents = byDay[date];
+    const dayWorkouts = workoutsDay[date];
     const race = dayEvents.find((e) => e.kind === 'race');
-    const first = race ?? dayEvents[0];
+    // La carrera manda; después el primer entreno y, si no hay, el primer evento.
+    const icon = race ? EVENT_KIND_ICONS.race : dayWorkouts[0] ? SPORT_ICONS[dayWorkouts[0].sport] : dayEvents[0] ? EVENT_KIND_ICONS[dayEvents[0].kind] : null;
     return {
       date,
       letter: WEEKDAY_LETTERS[i],
       day: Number(date.slice(8, 10)),
-      icon: first ? EVENT_KIND_ICONS[first.kind] : null,
+      icon,
       highlight: !!race,
-      count: dayEvents.length,
+      count: dayEvents.length + dayWorkouts.length,
     };
   });
   const weekEvents = events.filter((e) => localDay(e.start_at) <= week[6] && localDay(e.end_at ?? e.start_at) >= week[0]);
+  // Lista de la semana: por día, primero los entrenos y después los eventos.
+  const weekItems: AgendaEntry[] = week.flatMap((date) => [
+    ...workoutsDay[date].map((w) => workoutToAgendaEntry(w, summaries[w.id], `${longDayLabel(date)} · ${workoutSummary(w, summaries[w.id])}`)),
+    ...weekEvents
+      .filter((e) => localDay(e.start_at) === date || (date === week[0] && localDay(e.start_at) < date))
+      .map((e) => toAgendaEntry(e, `${longDayLabel(localDay(e.start_at))} · ${toAgendaEntry(e).subtitle}`)),
+  ]);
   const todayEvents = byDay[today] ?? [];
+  const todayWorkouts = (workoutsDay[today] ?? []).filter((w) => w.status !== 'skipped');
+  const heroWorkout = todayWorkouts.find((w) => w.status === 'planned') ?? todayWorkouts[0] ?? null;
+  const otherToday: AgendaEntry[] = [
+    ...todayWorkouts.filter((w) => w !== heroWorkout).map((w) => workoutToAgendaEntry(w, summaries[w.id])),
+    ...todayEvents.map((e) => toAgendaEntry(e)),
+  ];
   const nextRace = events.find((e) => e.kind === 'race' && localDay(e.start_at) >= today);
   const fitness = data?.fitness.ok ? data.fitness.value : null;
   const noLoadYet = fitness != null && fitness.ctl === 0 && fitness.atl === 0;
@@ -116,18 +153,33 @@ export default function DashboardScreen({ navigation }: Props) {
         <>
           {!data.profile.ok ? <SectionError message={data.profile.error} /> : null}
 
-          <Card title="Entreno de hoy">
-            <Text style={local.heroTitle}>Sin sesión planificada</Text>
-            <Text style={local.heroText}>
-              El plan de entrenamiento todavía no existe en la API. Cuando lo haga, aquí verás la sesión del día con su duración y su carga.
-            </Text>
-            {todayEvents.length > 0 ? (
+          <Card title={heroWorkout ? `Entreno de hoy · ${SPORT_LABELS[heroWorkout.sport].toLowerCase()}` : 'Entreno de hoy'}>
+            {!data.workouts.ok ? <SectionError message={data.workouts.error} /> : null}
+            {heroWorkout ? (
+              <>
+                <Text style={[local.heroTitle, heroWorkout.status === 'done' && local.heroDone]}>{heroWorkout.title}</Text>
+                <Text style={local.heroText}>{workoutSummary(heroWorkout, summaries[heroWorkout.id])}</Text>
+              </>
+            ) : data.workouts.ok ? (
+              <>
+                <Text style={local.heroTitle}>Sin sesión planificada</Text>
+                <Text style={local.heroText}>Hoy no tienes ningún entreno en el plan.</Text>
+              </>
+            ) : null}
+            {otherToday.length > 0 ? (
               <View style={local.heroEvents}>
-                <AgendaItems items={todayEvents.map((e) => toAgendaEntry(e))} onPressItem={openEvent} />
+                <AgendaItems items={otherToday} onPressItem={openEvent} />
               </View>
             ) : null}
             <View style={local.heroActions}>
-              <Button title="Ver el plan" onPress={() => navigation.navigate('Plan')} />
+              {heroWorkout && hasSessionScreen(heroWorkout) ? (
+                <Button
+                  title={heroWorkout.status === 'done' ? 'Ver sesión' : 'Abrir sesión'}
+                  onPress={() => navigation.navigate('StrengthSession', { id: heroWorkout.id })}
+                />
+              ) : (
+                <Button title="Ver el plan" onPress={() => navigation.navigate('Plan')} />
+              )}
             </View>
           </Card>
 
@@ -157,13 +209,8 @@ export default function DashboardScreen({ navigation }: Props) {
           <Section title="Esta semana" right={<Button title="Plan" variant="text" onPress={() => navigation.navigate('Plan')} />}>
             {!data.events.ok ? <SectionError message={data.events.error} /> : null}
             <WeekStrip days={weekStrip} today={today} />
-            {data.events.ok && weekEvents.length === 0 ? <Text style={styles.muted}>Sin eventos esta semana.</Text> : null}
-            {weekEvents.length > 0 ? (
-              <AgendaItems
-                items={weekEvents.map((e) => toAgendaEntry(e, `${longDayLabel(localDay(e.start_at))} · ${toAgendaEntry(e).subtitle}`))}
-                onPressItem={openEvent}
-              />
-            ) : null}
+            {data.events.ok && data.workouts.ok && weekItems.length === 0 ? <Text style={styles.muted}>Nada planificado esta semana.</Text> : null}
+            {weekItems.length > 0 ? <AgendaItems items={weekItems} onPressItem={openEvent} /> : null}
           </Section>
 
           <Section title="Próximo objetivo">
@@ -196,6 +243,7 @@ export default function DashboardScreen({ navigation }: Props) {
 const local = StyleSheet.create({
   date: { ...typography.label, color: colors.textSecondary, marginTop: -spacing.md },
   heroTitle: { ...typography.title, color: colors.text },
+  heroDone: { color: colors.textSecondary },
   heroText: { ...typography.small, color: colors.textSecondary },
   heroEvents: { paddingTop: spacing.sm, borderTopWidth: lines.hairline, borderTopColor: colors.separatorStrong },
   heroActions: { flexDirection: 'row', paddingTop: spacing.sm },

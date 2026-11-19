@@ -25,6 +25,12 @@ import { colors, fonts, layout, lines, radius, spacing, typography } from './the
 
 type ScreenProps = {
   title: string;
+  /** Etiqueta en mayúsculas encima del título («Fuerza · jueves 19 de noviembre»). */
+  eyebrow?: string;
+  /** Barra fija al pie, fuera del desplazamiento (acciones de la sesión). */
+  footer?: React.ReactNode;
+  /** Para desplazar la pantalla desde fuera (p. ej. ir al final desde el pie). */
+  scrollRef?: React.RefObject<ScrollView | null>;
   onBack?: () => void;
   right?: React.ReactNode;
   children: React.ReactNode;
@@ -38,8 +44,9 @@ type ScreenProps = {
 };
 
 /** Pantalla con barra sin fondo (volver y acciones) y título grande que se desplaza con el contenido. */
-export function Screen({ title, onBack, right, children, refreshing, onRefresh, error, onDismissError, mockBanner = true }: ScreenProps) {
-  const scroll = useRef<ScrollView>(null);
+export function Screen({ title, eyebrow, footer, scrollRef, onBack, right, children, refreshing, onRefresh, error, onDismissError, mockBanner = true }: ScreenProps) {
+  const ownScroll = useRef<ScrollView>(null);
+  const scroll = scrollRef ?? ownScroll;
   useEffect(() => {
     if (error) scroll.current?.scrollTo({ y: 0, animated: true });
   }, [error]);
@@ -66,14 +73,22 @@ export function Screen({ title, onBack, right, children, refreshing, onRefresh, 
         }
       >
         <View style={[styles.column, styles.content, !(onBack || right) && styles.contentNoBar]}>
-          <Text style={styles.title} accessibilityRole="header">
-            {title}
-          </Text>
+          <View style={styles.titleBlock}>
+            {eyebrow ? <Text style={styles.sectionLabel}>{eyebrow}</Text> : null}
+            <Text style={styles.title} accessibilityRole="header">
+              {title}
+            </Text>
+          </View>
           {mockBanner ? <MockBanner /> : null}
           <ErrorBanner message={error ?? null} onDismiss={onDismissError} />
           {children}
         </View>
       </ScrollView>
+      {footer ? (
+        <SafeAreaView edges={['bottom']} style={styles.footer}>
+          <View style={[styles.column, styles.footerContent]}>{footer}</View>
+        </SafeAreaView>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -325,6 +340,9 @@ export const styles = StyleSheet.create({
   content: { gap: spacing.xl },
   contentNoBar: { paddingTop: spacing.xl },
   title: { ...typography.display, color: colors.text },
+  titleBlock: { gap: spacing.sm },
+  footer: { backgroundColor: colors.background, borderTopWidth: lines.hairline, borderTopColor: colors.separator },
+  footerContent: { paddingVertical: spacing.md },
   banner: { padding: spacing.md, borderRadius: radius.sm },
   warning: { backgroundColor: colors.warningSurface },
   warningText: { ...typography.small, color: colors.warning },

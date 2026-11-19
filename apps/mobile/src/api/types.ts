@@ -36,3 +36,19 @@ export type ErrorResponse = S['ErrorResponse'];
 export type IntegrationOut = S['IntegrationOut'];
 export type Provider = S['Provider'];
 export type SyncOut = S['SyncOut'];
+
+// Fuerza (contrato de #30).
+export type PlannedWorkoutOut = S['PlannedWorkoutOut'];
+export type PlannedWorkoutStatus = S['PlannedWorkoutStatus'];
+export type ExerciseOut = S['ExerciseOut'];
+export type ExerciseMode = S['ExerciseMode'];
+export type MuscleGroup = S['MuscleGroup'];
+export type ExerciseLastLogOut = S['ExerciseLastLogOut'];
+export type LastSetOut = S['LastSetOut'];
+export type PlannedStrengthExerciseOut = S['PlannedStrengthExerciseOut'];
+export type StrengthWorkoutOut = S['StrengthWorkoutOut'];
+export type StrengthSetIn = S['StrengthSetIn'];
+export type StrengthSetLogOut = S['StrengthSetLogOut'];
+export type StrengthSetsPut = S['StrengthSetsPut'];
+export type StrengthWorkoutComplete = S['StrengthWorkoutComplete'];
+export type StrengthActivityOut = S['StrengthActivityOut'];
