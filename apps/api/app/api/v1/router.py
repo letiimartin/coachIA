@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     athlete,
     calendar,
+    coach,
     fitness,
     integrations,
     me,
@@ -21,3 +22,4 @@ api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(threshold_proposals.router)
 api_v1_router.include_router(strength.planned_router)
 api_v1_router.include_router(strength.router)
+api_v1_router.include_router(coach.router)

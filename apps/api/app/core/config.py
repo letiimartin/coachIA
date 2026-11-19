@@ -1,12 +1,52 @@
 """Configuración tipada de la API, leída de variables de entorno o de un fichero .env."""
 
+from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["local", "test", "production"]
+
+
+class ModelPrice(BaseModel):
+    """Precio oficial de un modelo en USD por millón de tokens (MTok).
+
+    `cache_write` es la escritura en la caché de 5 minutos y `cache_read`, la lectura. Si el
+    proveedor cobra más a partir de cierto tamaño de prompt, `long_context_over_tokens` es ese
+    umbral (tokens de entrada, incluida la caché) y `long_context_multiplier`, el recargo.
+    """
+
+    input: Decimal = Field(ge=0)
+    output: Decimal = Field(ge=0)
+    cache_write: Decimal = Field(ge=0)
+    cache_read: Decimal = Field(ge=0)
+    long_context_over_tokens: int | None = Field(default=None, gt=0)
+    long_context_multiplier: Decimal = Field(default=Decimal(1), ge=1)
+
+
+# Precios oficiales de Anthropic (https://platform.claude.com/docs/en/about-claude/pricing),
+# consultados el 19 de noviembre de 2026. Se pueden sobrescribir con COACH_LLM_PRICES (JSON).
+DEFAULT_LLM_PRICES: dict[str, ModelPrice] = {
+    "claude-haiku-5-5": ModelPrice(
+        input=Decimal("0.10"),
+        output=Decimal("0.50"),
+        cache_write=Decimal("0.125"),
+        cache_read=Decimal("0.01"),
+        long_context_over_tokens=100_000,
+        long_context_multiplier=Decimal(5),
+    ),
+    "claude-sonnet-5-5": ModelPrice(
+        input=Decimal(2),
+        output=Decimal(10),
+        cache_write=Decimal("2.50"),
+        cache_read=Decimal("0.10"),
+    ),
+    "claude-opus-5-5": ModelPrice(
+        input=Decimal(4), output=Decimal(20), cache_write=Decimal(5), cache_read=Decimal("0.20")
+    ),
+}
 
 
 class Settings(BaseSettings):
@@ -46,6 +86,31 @@ class Settings(BaseSettings):
     wahoo_redirect_uri: str = "https://letismartcoach.onrender.com/auth/wahoo/callback"
     wahoo_api_base_url: str = "https://api.wahooligan.com"
     wahoo_scopes: str = "user_read workouts_read workouts_write plans_read plans_write"
+
+    # Coach (#55). Sin la clave del proveedor, el coach no llama al LLM: los endpoints que lo
+    # necesitan responden 503 `coach_unavailable` (el filtro de seguridad funciona igual).
+    anthropic_api_key: SecretStr | None = None
+    # Modelo económico por defecto, provisional hasta la evaluación (`evals/coach`).
+    coach_model: str = "claude-haiku-5-5"
+    # Modelo de los resúmenes de conversación. Por defecto, el mismo que conversa.
+    coach_summary_model: str | None = None
+    coach_effort: Literal["low", "medium", "high"] | None = "low"
+    coach_max_output_tokens: int = Field(default=1500, ge=256, le=16000)
+    # Contexto de cada respuesta: los últimos N mensajes y un resumen de los anteriores, que se
+    # actualiza cuando quedan al menos `coach_summary_batch` mensajes fuera de la ventana.
+    coach_history_messages: int = Field(default=12, ge=2, le=100)
+    coach_summary_batch: int = Field(default=8, ge=1, le=100)
+    # Rondas máximas de herramientas en una respuesta.
+    coach_max_tool_rounds: int = Field(default=5, ge=1, le=10)
+    # Presupuesto mensual (todas las llamadas del mes: conversación, resúmenes, planificador).
+    coach_monthly_budget_eur: Decimal = Field(default=Decimal("4.00"), ge=0)
+    coach_budget_warning_ratio: Decimal = Field(default=Decimal("0.8"), gt=0, le=1)
+    # Cambio USD→EUR para pasar a euros los precios oficiales (en dólares). 1.0 por defecto:
+    # sobrestima el coste en euros, así que el límite nunca se queda corto.
+    coach_usd_to_eur: Decimal = Field(default=Decimal("1.0"), gt=0)
+    coach_llm_prices: dict[str, ModelPrice] = Field(
+        default_factory=lambda: dict(DEFAULT_LLM_PRICES)
+    )
 
     # A dónde vuelve el usuario tras conectar una integración.
     app_return_url_mobile: str = "letismartcoach://integrations"
@@ -100,6 +165,10 @@ class Settings(BaseSettings):
             and self.token_encryption_key
             and self.oauth_state_secret
         )
+
+    @property
+    def coach_configured(self) -> bool:
+        return self.anthropic_api_key is not None
 
     @property
     def supabase_issuer(self) -> str | None:

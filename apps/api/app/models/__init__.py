@@ -3,6 +3,19 @@
 from app.models.activity import Activity, ActivitySource, LoadMethod
 from app.models.athlete import AthleteProfile, AthleteThreshold, AvailabilitySlot
 from app.models.calendar import CalendarEvent, EventKind, Race, RacePriority, TrainingImpact
+from app.models.coach import (
+    CoachConversation,
+    CoachLlmCall,
+    CoachMemory,
+    CoachMessage,
+    ConversationKind,
+    LlmCallPurpose,
+    MemoryKind,
+    MemorySource,
+    MemoryStatus,
+    MessageOrigin,
+    MessageRole,
+)
 from app.models.common import Sport
 from app.models.fitness import DailyLoad
 from app.models.integration import Integration, IntegrationStatus, Provider
@@ -24,6 +37,11 @@ __all__ = [
     "AthleteThreshold",
     "AvailabilitySlot",
     "CalendarEvent",
+    "CoachConversation",
+    "CoachLlmCall",
+    "CoachMemory",
+    "CoachMessage",
+    "ConversationKind",
     "DailyLoad",
     "EventKind",
     "Exercise",
@@ -31,7 +49,13 @@ __all__ = [
     "ExerciseOrigin",
     "Integration",
     "IntegrationStatus",
+    "LlmCallPurpose",
     "LoadMethod",
+    "MemoryKind",
+    "MemorySource",
+    "MemoryStatus",
+    "MessageOrigin",
+    "MessageRole",
     "MuscleGroup",
     "PlannedStrengthExercise",
     "PlannedWorkout",

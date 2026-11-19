@@ -8,6 +8,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.coach.llm.base import LLMProvider
 from app.core.config import Settings
 from app.core.crypto import TokenCipher
 from app.core.errors import ForbiddenError, ServiceUnavailableError, UnauthorizedError
@@ -55,6 +56,12 @@ def get_wahoo_client(request: Request) -> WahooClient:
     return client
 
 
+def get_llm_provider(request: Request) -> LLMProvider | None:
+    """Proveedor del coach; None si no está configurado (el coach responde 503)."""
+    provider: LLMProvider | None = request.app.state.llm_provider
+    return provider
+
+
 def get_db_session(database: Annotated[Database, Depends(get_database)]) -> Iterator[Session]:
     yield from database.session()
 
@@ -88,4 +95,5 @@ DbSession = Annotated[Session, Depends(get_db_session)]
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 TokenCipherDep = Annotated[TokenCipher, Depends(get_token_cipher)]
 StateSignerDep = Annotated[OAuthStateSigner, Depends(get_state_signer)]
+LlmProviderDep = Annotated[LLMProvider | None, Depends(get_llm_provider)]
 WahooClientDep = Annotated[WahooClient, Depends(get_wahoo_client)]

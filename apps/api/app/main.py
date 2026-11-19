@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api import health, internal
 from app.api.v1.router import api_v1_router
+from app.coach.llm.anthropic import AnthropicProvider
+from app.coach.llm.base import LLMProvider
 from app.core.config import Settings, get_settings
 from app.core.crypto import TokenCipher
 from app.core.errors import register_exception_handlers
@@ -39,6 +41,7 @@ def create_app(
     token_verifier: TokenVerifier | None = None,
     database: Database | None = None,
     wahoo_client: WahooClient | None = None,
+    llm_provider: LLMProvider | None = None,
 ) -> FastAPI:
     """Crea la aplicación. Los parámetros permiten inyectar dependencias en los tests."""
     settings = settings or get_settings()
@@ -69,6 +72,9 @@ def create_app(
     if wahoo_client is None and settings.wahoo_configured:
         wahoo_client = WahooClient(settings, httpx.Client())
     app.state.wahoo_client = wahoo_client
+    if llm_provider is None and settings.anthropic_api_key is not None:
+        llm_provider = AnthropicProvider(settings.anthropic_api_key.get_secret_value())
+    app.state.llm_provider = llm_provider
 
     if settings.cors_origins:
         app.add_middleware(
