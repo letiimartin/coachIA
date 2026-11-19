@@ -882,6 +882,175 @@
         "title": "EventKind",
         "type": "string"
       },
+      "ExerciseLastLogOut": {
+        "description": "Última sesión **completada** en la que se registró el ejercicio, con sus series.\n\nSi nunca se ha registrado, `performed_on`, `activity_id` y `planned_workout_id` son null\ny `sets` está vacía.",
+        "examples": [
+          {
+            "activity_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+            "exercise": {
+              "aliases": [
+                "Sentadilla con barra",
+                "Back squat"
+              ],
+              "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+              "mode": "reps",
+              "muscle_group": "quadriceps",
+              "name": "Sentadilla trasera",
+              "origin": "system",
+              "slug": "back_squat"
+            },
+            "performed_on": "2026-11-12",
+            "planned_workout_id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+            "sets": [
+              {
+                "completed": true,
+                "reps": 8,
+                "rir": 2,
+                "set_number": 1,
+                "weight_kg": 60.0
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "activity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "exercise": {
+            "$ref": "#/components/schemas/ExerciseOut"
+          },
+          "performed_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Día local de la sesión.",
+            "title": "Performed On"
+          },
+          "planned_workout_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Workout Id"
+          },
+          "sets": {
+            "description": "Series de ese ejercicio, por `set_number`.",
+            "items": {
+              "$ref": "#/components/schemas/LastSetOut"
+            },
+            "title": "Sets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exercise",
+          "performed_on",
+          "activity_id",
+          "planned_workout_id",
+          "sets"
+        ],
+        "title": "ExerciseLastLogOut",
+        "type": "object"
+      },
+      "ExerciseMode": {
+        "description": "Cómo se mide cada serie: repeticiones o segundos (isométricos, cargadas…).",
+        "enum": [
+          "reps",
+          "seconds"
+        ],
+        "title": "ExerciseMode",
+        "type": "string"
+      },
+      "ExerciseOrigin": {
+        "enum": [
+          "system",
+          "coach",
+          "user"
+        ],
+        "title": "ExerciseOrigin",
+        "type": "string"
+      },
+      "ExerciseOut": {
+        "description": "Ejercicio del catálogo. `id` es el identificador estable; `slug`, su forma legible.",
+        "examples": [
+          {
+            "aliases": [
+              "Sentadilla con barra",
+              "Back squat"
+            ],
+            "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+            "mode": "reps",
+            "muscle_group": "quadriceps",
+            "name": "Sentadilla trasera",
+            "origin": "system",
+            "slug": "back_squat"
+          }
+        ],
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ExerciseMode",
+            "description": "`reps`: cada serie se mide en repeticiones; `seconds`, en segundos."
+          },
+          "muscle_group": {
+            "$ref": "#/components/schemas/MuscleGroup"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ExerciseOrigin",
+            "description": "`system` (catálogo común), `coach` o `user` (propios de la atleta)."
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "aliases",
+          "muscle_group",
+          "mode",
+          "origin"
+        ],
+        "title": "ExerciseOut",
+        "type": "object"
+      },
       "FitnessDayOut": {
         "description": "Un día de la serie. Valores redondeados a 1 decimal.\n\n- `load`: carga total del día (suma del TSS/hrTSS/rTSS de sus actividades, sin duplicados).\n- `ctl`: forma física (media exponencial de 42 días) al final del día.\n- `atl`: fatiga (media exponencial de 7 días) al final del día.\n- `tsb`: frescura con la que se empieza el día: CTL − ATL **del día anterior**\n  (criterio de TrainingPeaks).",
         "properties": {
@@ -1132,6 +1301,96 @@
         "title": "InternalSyncOut",
         "type": "object"
       },
+      "LastSetOut": {
+        "properties": {
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps"
+          },
+          "rir": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rir"
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "set_number": {
+            "title": "Set Number",
+            "type": "integer"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "set_number",
+          "reps",
+          "seconds",
+          "weight_kg",
+          "rpe",
+          "rir",
+          "completed"
+        ],
+        "title": "LastSetOut",
+        "type": "object"
+      },
+      "LoadMethod": {
+        "description": "Cómo se calculó la carga.\n\n`power`, `heart_rate`, `pace` y `rpe` son TSS (o una estimación de TSS) de resistencia y\nsuman en CTL/ATL. `session_rpe` es la carga de fuerza (minutos × RPE de la sesión, Foster):\nno es TSS y no suma nunca en `daily_load`.",
+        "enum": [
+          "power",
+          "heart_rate",
+          "pace",
+          "rpe",
+          "session_rpe"
+        ],
+        "title": "LoadMethod",
+        "type": "string"
+      },
       "MeResponse": {
         "properties": {
           "email": {
@@ -1157,6 +1416,24 @@
         ],
         "title": "MeResponse",
         "type": "object"
+      },
+      "MuscleGroup": {
+        "description": "Grupo muscular principal del ejercicio.",
+        "enum": [
+          "quadriceps",
+          "hamstrings",
+          "glutes",
+          "hips",
+          "calves",
+          "core",
+          "chest",
+          "back",
+          "shoulders",
+          "arms",
+          "full_body"
+        ],
+        "title": "MuscleGroup",
+        "type": "string"
       },
       "NextThresholdOut": {
         "description": "Siguiente registro de umbrales después de `test_date`. No se toca al aceptar.",
@@ -1205,6 +1482,202 @@
         ],
         "title": "PingResponse",
         "type": "object"
+      },
+      "PlannedStrengthExerciseOut": {
+        "description": "Ejercicio de la sesión. Exactamente uno de `target_reps` y `target_seconds`, según el\n`mode` del ejercicio. Peso, RPE y RIR objetivo son opcionales.",
+        "properties": {
+          "exercise": {
+            "$ref": "#/components/schemas/ExerciseOut"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "position": {
+            "description": "Orden en la sesión (desde 1).",
+            "title": "Position",
+            "type": "integer"
+          },
+          "sets": {
+            "title": "Sets",
+            "type": "integer"
+          },
+          "target_reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Reps"
+          },
+          "target_rir": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Rir"
+          },
+          "target_rpe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Rpe"
+          },
+          "target_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Seconds"
+          },
+          "target_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight Kg"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "exercise",
+          "sets",
+          "target_reps",
+          "target_seconds",
+          "target_weight_kg",
+          "target_rpe",
+          "target_rir",
+          "notes"
+        ],
+        "title": "PlannedStrengthExerciseOut",
+        "type": "object"
+      },
+      "PlannedWorkoutOut": {
+        "description": "Entreno planificado de cualquier disciplina. La fuerza es el primer tipo.\n\n- `planned`: pendiente.\n- `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).\n- `skipped`: no se hizo.",
+        "examples": [
+          {
+            "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
+            "created_at": "2026-11-18T10:00:00Z",
+            "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+            "scheduled_on": "2026-11-19",
+            "sport": "strength",
+            "status": "planned",
+            "title": "Fuerza de piernas",
+            "updated_at": "2026-11-18T10:00:00Z"
+          }
+        ],
+        "properties": {
+          "activity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "coach_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Por qué lo propone el coach.",
+            "title": "Coach Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "scheduled_on": {
+            "description": "Día local para el que está planificado.",
+            "format": "date",
+            "title": "Scheduled On",
+            "type": "string"
+          },
+          "sport": {
+            "$ref": "#/components/schemas/Sport"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlannedWorkoutStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sport",
+          "scheduled_on",
+          "title",
+          "status",
+          "coach_reason",
+          "activity_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PlannedWorkoutOut",
+        "type": "object"
+      },
+      "PlannedWorkoutStatus": {
+        "enum": [
+          "planned",
+          "done",
+          "skipped"
+        ],
+        "title": "PlannedWorkoutStatus",
+        "type": "string"
       },
       "PreferredTime": {
         "enum": [
@@ -2048,6 +2521,533 @@
           "event_time"
         ],
         "title": "StravaEvent",
+        "type": "object"
+      },
+      "StrengthActivityOut": {
+        "description": "Actividad creada al completar la sesión, con su carga `session_rpe` (minutos × RPE).\n\nEsa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB.",
+        "properties": {
+          "elapsed_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed S"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "load": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load"
+          },
+          "load_method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoadMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "start_at",
+          "elapsed_s",
+          "rpe",
+          "load",
+          "load_method"
+        ],
+        "title": "StrengthActivityOut",
+        "type": "object"
+      },
+      "StrengthSetIn": {
+        "additionalProperties": false,
+        "description": "Una serie hecha.\n\n- `planned_exercise_id`: el ejercicio planificado que cumple; null para una serie extra.\n- `exercise_id`: el ejercicio hecho. Si se omite, el del ejercicio planificado. Puede ser\n  otro (p. ej. una sustitución).\n- Exactamente uno de `reps` y `seconds`, según el `mode` del ejercicio.\n- `set_number` no se repite para el mismo ejercicio planificado (o el mismo ejercicio extra).",
+        "properties": {
+          "completed": {
+            "default": true,
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "exercise_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exercise Id"
+          },
+          "planned_exercise_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Exercise Id"
+          },
+          "reps": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps"
+          },
+          "rir": {
+            "anyOf": [
+              {
+                "description": "Repeticiones en reserva (0-10).",
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rir"
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "description": "Esfuerzo percibido (1-10).",
+                "maximum": 10.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "set_number": {
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Set Number",
+            "type": "integer"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "description": "Peso en kg (2 decimales).",
+                "exclusiveMaximum": 1000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "set_number"
+        ],
+        "title": "StrengthSetIn",
+        "type": "object"
+      },
+      "StrengthSetLogOut": {
+        "description": "Serie hecha. `planned_exercise_id` es el ejercicio planificado que cumple (null si es\nuna serie extra). `activity_id` es null hasta que se completa la sesión.",
+        "properties": {
+          "activity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "exercise_id": {
+            "format": "uuid",
+            "title": "Exercise Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "planned_exercise_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Exercise Id"
+          },
+          "reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps"
+          },
+          "rir": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rir"
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "set_number": {
+            "title": "Set Number",
+            "type": "integer"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "id",
+          "exercise_id",
+          "planned_exercise_id",
+          "activity_id",
+          "set_number",
+          "reps",
+          "seconds",
+          "weight_kg",
+          "rpe",
+          "rir",
+          "completed"
+        ],
+        "title": "StrengthSetLogOut",
+        "type": "object"
+      },
+      "StrengthSetsPut": {
+        "additionalProperties": false,
+        "description": "Todas las series de la sesión: sustituyen a las registradas antes.\n\nSirve para registrar durante el entreno (se envía la lista acumulada) y para editar después\nde completarlo. Una lista vacía borra las series.",
+        "examples": [
+          {
+            "sets": [
+              {
+                "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                "reps": 8,
+                "rir": 2,
+                "set_number": 1,
+                "weight_kg": 60
+              },
+              {
+                "completed": false,
+                "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                "reps": 6,
+                "set_number": 2,
+                "weight_kg": 60
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "sets": {
+            "items": {
+              "$ref": "#/components/schemas/StrengthSetIn"
+            },
+            "maxItems": 200,
+            "title": "Sets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sets"
+        ],
+        "title": "StrengthSetsPut",
+        "type": "object"
+      },
+      "StrengthWorkoutComplete": {
+        "additionalProperties": false,
+        "description": "Completa la sesión: crea la actividad de fuerza (`source = manual`) con su carga\n`session_rpe` = minutos × `rpe`.",
+        "examples": [
+          {
+            "duration_s": 3000,
+            "rpe": 7,
+            "started_at": "2026-11-19T18:30:00+01:00"
+          }
+        ],
+        "properties": {
+          "duration_s": {
+            "description": "Duración en segundos.",
+            "exclusiveMinimum": 0.0,
+            "maximum": 86400.0,
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "rpe": {
+            "description": "RPE de la sesión (1-10).",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rpe",
+            "type": "integer"
+          },
+          "started_at": {
+            "description": "Inicio de la sesión, con zona horaria.",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "started_at",
+          "duration_s",
+          "rpe"
+        ],
+        "title": "StrengthWorkoutComplete",
+        "type": "object"
+      },
+      "StrengthWorkoutOut": {
+        "description": "Detalle de una sesión de fuerza: ejercicios planificados, series hechas y actividad.",
+        "examples": [
+          {
+            "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
+            "created_at": "2026-11-18T10:00:00Z",
+            "exercises": [
+              {
+                "exercise": {
+                  "aliases": [
+                    "Sentadilla con barra",
+                    "Back squat"
+                  ],
+                  "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+                  "mode": "reps",
+                  "muscle_group": "quadriceps",
+                  "name": "Sentadilla trasera",
+                  "origin": "system",
+                  "slug": "back_squat"
+                },
+                "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                "position": 1,
+                "sets": 3,
+                "target_reps": 8,
+                "target_rir": 2,
+                "target_weight_kg": 60.0
+              }
+            ],
+            "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+            "scheduled_on": "2026-11-19",
+            "set_logs": [
+              {
+                "completed": true,
+                "exercise_id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+                "id": "1f2e3d4c-5b6a-4978-8a7b-6c5d4e3f2a1b",
+                "planned_exercise_id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                "reps": 8,
+                "rir": 2,
+                "set_number": 1,
+                "weight_kg": 60.0
+              }
+            ],
+            "sport": "strength",
+            "status": "planned",
+            "title": "Fuerza de piernas",
+            "updated_at": "2026-11-18T10:00:00Z"
+          }
+        ],
+        "properties": {
+          "activity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrengthActivityOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null hasta completar la sesión."
+          },
+          "activity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "coach_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Por qué lo propone el coach.",
+            "title": "Coach Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "exercises": {
+            "description": "Por `position`.",
+            "items": {
+              "$ref": "#/components/schemas/PlannedStrengthExerciseOut"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "scheduled_on": {
+            "description": "Día local para el que está planificado.",
+            "format": "date",
+            "title": "Scheduled On",
+            "type": "string"
+          },
+          "set_logs": {
+            "description": "Series hechas, por ejercicio planificado (las extras al final) y número.",
+            "items": {
+              "$ref": "#/components/schemas/StrengthSetLogOut"
+            },
+            "title": "Set Logs",
+            "type": "array"
+          },
+          "sport": {
+            "$ref": "#/components/schemas/Sport"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlannedWorkoutStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sport",
+          "scheduled_on",
+          "title",
+          "status",
+          "coach_reason",
+          "activity_id",
+          "created_at",
+          "updated_at",
+          "exercises",
+          "set_logs",
+          "activity"
+        ],
+        "title": "StrengthWorkoutOut",
         "type": "object"
       },
       "SyncOut": {
@@ -4895,6 +5895,543 @@
         "summary": "Read Me",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/v1/planned-workouts": {
+      "get": {
+        "description": "Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.\n\nSin paginar: el rango máximo es de 366 días. El detalle de una sesión de fuerza está en\n`GET /v1/strength/workouts/{id}`.",
+        "operationId": "list_planned_workouts_v1_planned_workouts_get",
+        "parameters": [
+          {
+            "description": "Primer día del rango (incluido).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "Primer día del rango (incluido).",
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Último día del rango (incluido).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "Último día del rango (incluido).",
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlannedWorkoutOut"
+                  },
+                  "title": "Response List Planned Workouts V1 Planned Workouts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Planned Workouts",
+        "tags": [
+          "planned-workouts"
+        ]
+      }
+    },
+    "/v1/strength/exercises": {
+      "get": {
+        "description": "Catálogo de ejercicios (los del sistema y los propios).\n\nCon `q`, primero los que empiezan por la búsqueda y después el resto, por nombre.",
+        "operationId": "search_exercises_v1_strength_exercises_get",
+        "parameters": [
+          {
+            "description": "Texto en el nombre o un alias, sin distinguir mayúsculas ni acentos.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Texto en el nombre o un alias, sin distinguir mayúsculas ni acentos.",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExerciseOut"
+                  },
+                  "title": "Response Search Exercises V1 Strength Exercises Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Exercises",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/exercises/{exercise_id}/last-log": {
+      "get": {
+        "description": "Series del ejercicio (peso y repeticiones o segundos) en la última sesión completada.\n\nSi nunca se ha registrado, `performed_on` es null y `sets` está vacía. 404 si el ejercicio no\nexiste.",
+        "operationId": "exercise_last_log_v1_strength_exercises__exercise_id__last_log_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exercise_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exercise Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseLastLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exercise Last Log",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/workouts/{workout_id}": {
+      "get": {
+        "description": "Sesión de fuerza: ejercicios planificados, series hechas y, si está completada, su\nactividad. 422 `not_strength` si el entreno es de otra disciplina.",
+        "operationId": "get_strength_workout_v1_strength_workouts__workout_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workout_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthWorkoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Datos no válidos o que no permiten completar la operación."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Strength Workout",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/workouts/{workout_id}/complete": {
+      "post": {
+        "description": "Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.\n\nLa actividad lleva `sport = strength`, `source = manual`, la duración y el `rpe`; su carga\nes `session_rpe` (minutos × RPE), que no suma en CTL/ATL/TSB. Las series registradas pasan\na la actividad. 409 si el entreno ya está hecho o saltado; 422 `not_strength`.",
+        "operationId": "complete_workout_v1_strength_workouts__workout_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workout_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrengthWorkoutComplete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthWorkoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Datos no válidos o que no permiten completar la operación."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Complete Workout",
+        "tags": [
+          "strength"
+        ]
+      }
+    },
+    "/v1/strength/workouts/{workout_id}/sets": {
+      "put": {
+        "description": "Registra o edita las series: la lista sustituye a todas las registradas antes.\n\nSe puede usar durante el entreno (enviando la lista acumulada) y después de completarlo.\n409 si el entreno está saltado. 422 con `code`: `not_strength`,\n`unknown_planned_exercise`, `unknown_exercise`, `mode_mismatch` y `duplicate_set`.",
+        "operationId": "replace_sets_v1_strength_workouts__workout_id__sets_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workout_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workout Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrengthSetsPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthWorkoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Datos no válidos o que no permiten completar la operación."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace Sets",
+        "tags": [
+          "strength"
         ]
       }
     },
