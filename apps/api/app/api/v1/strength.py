@@ -10,7 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentUser, DbSession
-from app.models import PlannedWorkout
+from app.models import PlannedWorkout, PlannedWorkoutStatus
 from app.schemas.common import error_responses
 from app.schemas.strength import (
     SEARCH_LIMIT_MAX,
@@ -33,21 +33,30 @@ planned_router = APIRouter(prefix="/planned-workouts", tags=["planned-workouts"]
 router = APIRouter(prefix="/strength", tags=["strength"])
 
 
-def _planned_out(workout: PlannedWorkout, exercise_count: int) -> PlannedWorkoutOut:
+def _planned_out(
+    workout: PlannedWorkout, exercise_count: int, actual_duration_s: int | None
+) -> PlannedWorkoutOut:
     return PlannedWorkoutOut.model_validate(
         {
             **{
                 name: getattr(workout, name)
                 for name in PlannedWorkoutOut.model_fields
-                if name != "exercise_count"
+                if name not in ("exercise_count", "actual_duration_s")
             },
             "exercise_count": exercise_count,
+            "actual_duration_s": actual_duration_s,
         }
     )
 
 
 def _workout_out(detail: StrengthWorkoutDetail) -> StrengthWorkoutOut:
-    base = _planned_out(detail.workout, len(detail.exercises))
+    activity = detail.activity
+    actual = (
+        activity.elapsed_s
+        if activity is not None and detail.workout.status == PlannedWorkoutStatus.DONE
+        else None
+    )
+    base = _planned_out(detail.workout, len(detail.exercises), actual)
     return StrengthWorkoutOut(
         **base.model_dump(),
         exercises=[
@@ -76,12 +85,12 @@ def list_planned_workouts(
 ) -> list[PlannedWorkoutOut]:
     """Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.
 
-    Sin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios y su
-    duración planificada (null si no se ha definido). El detalle de una sesión de fuerza está en
-    `GET /v1/strength/workouts/{id}`.
+    Sin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios, su
+    duración planificada (null si no se ha definido) y, si está hecho, la real de su actividad.
+    El detalle de una sesión de fuerza está en `GET /v1/strength/workouts/{id}`.
     """
     return [
-        _planned_out(item.workout, item.exercise_count)
+        _planned_out(item.workout, item.exercise_count, item.actual_duration_s)
         for item in strength.list_planned_workouts(db, user.id, date_range.from_, date_range.to)
     ]
 

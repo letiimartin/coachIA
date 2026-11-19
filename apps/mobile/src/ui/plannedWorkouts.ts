@@ -31,17 +31,17 @@ export function formatDuration(seconds: number): string {
 
 /**
  * «Fuerza · 6 ejercicios · 50 min», con el estado si ya no está pendiente. Todo sale de la lista
- * (`GET /v1/planned-workouts`, #52): el número de ejercicios y la duración planificada, sólo si se ha
- * definido y la sesión no está hecha. La duración real de una sesión hecha está en su pantalla.
+ * (`GET /v1/planned-workouts`, #52): el número de ejercicios y la duración, que es la real (de su
+ * actividad) si la sesión está hecha y la planificada si no, cada una sólo si existe.
  */
 export function workoutSummary(workout: PlannedWorkoutOut): string {
   const count = workout.exercise_count;
-  const planned = workout.status !== 'done' ? workout.planned_duration_s : null;
+  const duration = workout.status === 'done' ? workout.actual_duration_s : workout.planned_duration_s;
   return [
     SPORT_LABELS[workout.sport],
     workout.status === 'done' ? 'hecho' : workout.status === 'skipped' ? 'saltado' : null,
     workout.sport === 'strength' ? (count === 1 ? '1 ejercicio' : `${count} ejercicios`) : null,
-    planned ? formatDuration(planned) : null,
+    duration ? formatDuration(duration) : null,
   ]
     .filter(Boolean)
     .join(' · ');

@@ -40,6 +40,7 @@ function normalizeWorkout(raw: unknown): StrengthWorkoutOut {
     coach_reason: w.coach_reason ?? null,
     exercise_count: w.exercises.length,
     planned_duration_s: w.planned_duration_s ?? null,
+    actual_duration_s: w.actual_duration_s ?? null,
     activity_id: w.activity_id ?? null,
     activity: w.activity ?? null,
     exercises: w.exercises.map((e) => ({
@@ -127,6 +128,7 @@ export const strengthMock = {
     const activityId = uuid();
     w.status = 'done';
     w.activity_id = activityId;
+    w.actual_duration_s = body.duration_s;
     w.activity = { id: activityId, start_at: body.started_at, elapsed_s: body.duration_s, rpe: body.rpe ?? null, load: null, load_method: null };
     w.set_logs = w.set_logs.map((s) => ({ ...s, activity_id: activityId }));
     return delay(w);

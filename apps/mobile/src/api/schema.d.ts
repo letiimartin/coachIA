@@ -516,9 +516,9 @@ export interface paths {
          * List Planned Workouts
          * @description Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.
          *
-         *     Sin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios y su
-         *     duración planificada (null si no se ha definido). El detalle de una sesión de fuerza está en
-         *     `GET /v1/strength/workouts/{id}`.
+         *     Sin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios, su
+         *     duración planificada (null si no se ha definido) y, si está hecho, la real de su actividad.
+         *     El detalle de una sesión de fuerza está en `GET /v1/strength/workouts/{id}`.
          */
         get: operations["list_planned_workouts_v1_planned_workouts_get"];
         put?: never;
@@ -1560,8 +1560,8 @@ export interface components {
          *     - `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).
          *     - `skipped`: no se hizo.
          *
-         *     `exercise_count` y `planned_duration_s` resumen la sesión sin pedir su detalle. La duración
-         *     real está en la actividad (`activity_id`) cuando el entreno está hecho.
+         *     `exercise_count`, `planned_duration_s` y `actual_duration_s` resumen la sesión sin pedir su
+         *     detalle. La duración real es la de la actividad que lo cumplió.
          * @example {
          *       "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
          *       "created_at": "2026-11-18T10:00:00Z",
@@ -1578,6 +1578,11 @@ export interface components {
         PlannedWorkoutOut: {
             /** Activity Id */
             activity_id: string | null;
+            /**
+             * Actual Duration S
+             * @description Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.
+             */
+            actual_duration_s: number | null;
             /**
              * Coach Reason
              * @description Por qué lo propone el coach.
@@ -2166,6 +2171,11 @@ export interface components {
             activity: components["schemas"]["StrengthActivityOut"] | null;
             /** Activity Id */
             activity_id: string | null;
+            /**
+             * Actual Duration S
+             * @description Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.
+             */
+            actual_duration_s: number | null;
             /**
              * Coach Reason
              * @description Por qué lo propone el coach.

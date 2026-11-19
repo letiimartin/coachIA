@@ -1586,7 +1586,7 @@
         "type": "object"
       },
       "PlannedWorkoutOut": {
-        "description": "Entreno planificado de cualquier disciplina. La fuerza es el primer tipo.\n\n- `planned`: pendiente.\n- `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).\n- `skipped`: no se hizo.\n\n`exercise_count` y `planned_duration_s` resumen la sesión sin pedir su detalle. La duración\nreal está en la actividad (`activity_id`) cuando el entreno está hecho.",
+        "description": "Entreno planificado de cualquier disciplina. La fuerza es el primer tipo.\n\n- `planned`: pendiente.\n- `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).\n- `skipped`: no se hizo.\n\n`exercise_count`, `planned_duration_s` y `actual_duration_s` resumen la sesión sin pedir su\ndetalle. La duración real es la de la actividad que lo cumplió.",
         "examples": [
           {
             "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
@@ -1613,6 +1613,18 @@
               }
             ],
             "title": "Activity Id"
+          },
+          "actual_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.",
+            "title": "Actual Duration S"
           },
           "coach_reason": {
             "anyOf": [
@@ -1685,6 +1697,7 @@
           "coach_reason",
           "exercise_count",
           "planned_duration_s",
+          "actual_duration_s",
           "activity_id",
           "created_at",
           "updated_at"
@@ -3004,6 +3017,18 @@
             ],
             "title": "Activity Id"
           },
+          "actual_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.",
+            "title": "Actual Duration S"
+          },
           "coach_reason": {
             "anyOf": [
               {
@@ -3091,6 +3116,7 @@
           "coach_reason",
           "exercise_count",
           "planned_duration_s",
+          "actual_duration_s",
           "activity_id",
           "created_at",
           "updated_at",
@@ -5951,7 +5977,7 @@
     },
     "/v1/planned-workouts": {
       "get": {
-        "description": "Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.\n\nSin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios y su\nduración planificada (null si no se ha definido). El detalle de una sesión de fuerza está en\n`GET /v1/strength/workouts/{id}`.",
+        "description": "Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.\n\nSin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios, su\nduración planificada (null si no se ha definido) y, si está hecho, la real de su actividad.\nEl detalle de una sesión de fuerza está en `GET /v1/strength/workouts/{id}`.",
         "operationId": "list_planned_workouts_v1_planned_workouts_get",
         "parameters": [
           {

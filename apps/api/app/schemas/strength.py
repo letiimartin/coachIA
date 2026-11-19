@@ -138,6 +138,7 @@ _WORKOUT_EXAMPLE: dict[str, Any] = {
     "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
     "exercise_count": 1,
     "planned_duration_s": 3000,
+    "actual_duration_s": None,
     "activity_id": None,
     "created_at": "2026-11-18T10:00:00Z",
     "updated_at": "2026-11-18T10:00:00Z",
@@ -151,8 +152,8 @@ class PlannedWorkoutOut(BaseModel):
     - `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).
     - `skipped`: no se hizo.
 
-    `exercise_count` y `planned_duration_s` resumen la sesión sin pedir su detalle. La duración
-    real está en la actividad (`activity_id`) cuando el entreno está hecho.
+    `exercise_count`, `planned_duration_s` y `actual_duration_s` resumen la sesión sin pedir su
+    detalle. La duración real es la de la actividad que lo cumplió.
     """
 
     model_config = ConfigDict(
@@ -170,6 +171,10 @@ class PlannedWorkoutOut(BaseModel):
     )
     planned_duration_s: int | None = Field(
         description="Duración planificada en segundos. Null si no se ha definido (no se estima)."
+    )
+    actual_duration_s: int | None = Field(
+        description="Duración real en segundos, de su actividad. Null si no está hecho o la "
+        "actividad no la tiene."
     )
     activity_id: UUID | None
     created_at: datetime

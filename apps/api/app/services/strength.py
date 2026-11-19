@@ -122,10 +122,12 @@ def create_exercise(
 
 @dataclass(frozen=True, slots=True)
 class PlannedWorkoutSummary:
-    """Entreno planificado con su número de ejercicios (0 si no es de fuerza)."""
+    """Entreno planificado con su número de ejercicios (0 si no es de fuerza) y su duración
+    real (la de su actividad; null si no está hecho o la actividad no la tiene)."""
 
     workout: PlannedWorkout
     exercise_count: int
+    actual_duration_s: int | None
 
 
 def list_planned_workouts(
@@ -139,7 +141,14 @@ def list_planned_workouts(
         .scalar_subquery()
     )
     rows = session.execute(
-        sa.select(PlannedWorkout, exercise_count)
+        sa.select(PlannedWorkout, exercise_count, Activity.elapsed_s)
+        .outerjoin(
+            Activity,
+            sa.and_(
+                Activity.id == PlannedWorkout.activity_id,
+                PlannedWorkout.status == PlannedWorkoutStatus.DONE,
+            ),
+        )
         .where(
             PlannedWorkout.user_id == user_id,
             PlannedWorkout.scheduled_on >= start,
@@ -147,7 +156,7 @@ def list_planned_workouts(
         )
         .order_by(PlannedWorkout.scheduled_on, PlannedWorkout.created_at, PlannedWorkout.id)
     ).all()
-    return [PlannedWorkoutSummary(workout, count) for workout, count in rows]
+    return [PlannedWorkoutSummary(workout, count, elapsed_s) for workout, count, elapsed_s in rows]
 
 
 @dataclass(frozen=True, slots=True)

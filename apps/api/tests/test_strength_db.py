@@ -228,10 +228,36 @@ def test_list_planned_workouts_by_range(
     assert body[0]["coach_reason"] == "Base de fuerza."
     assert body[0]["activity_id"] is None
     # Resumen sin pedir el detalle (#52): sin duración planificada queda null, no se estima.
-    assert [(item["exercise_count"], item["planned_duration_s"]) for item in body] == [
-        (2, 2700),
-        (2, None),
-    ]
+    assert [
+        (item["exercise_count"], item["planned_duration_s"], item["actual_duration_s"])
+        for item in body
+    ] == [(2, 2700, None), (2, None, None)]
+
+
+def test_list_has_the_actual_duration_of_done_workouts(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
+) -> None:
+    """#52: la duración real sale de la actividad, en la misma lista, sólo si está hecho."""
+    done = _workout(engine, athlete_id, title="Hecho", planned_duration_s=3000)
+    _complete(db_client, headers, done, duration_s=2700)
+    pending = _workout(engine, athlete_id, title="Pendiente", planned_duration_s=3000)
+    deleted = _workout(engine, athlete_id, title="Actividad borrada")
+    activity_id = _complete(db_client, headers, deleted).json()["activity_id"]
+    with Session(engine) as session:
+        session.delete(session.get_one(Activity, uuid.UUID(activity_id)))
+        session.commit()
+
+    body = db_client.get(
+        "/v1/planned-workouts", headers=headers, params={"from": DAY, "to": DAY}
+    ).json()
+
+    assert {item["id"]: item["actual_duration_s"] for item in body} == {
+        str(done): 2700,
+        str(pending): None,
+        str(deleted): None,
+    }
+    detail = db_client.get(f"/v1/strength/workouts/{done}", headers=headers).json()
+    assert (detail["planned_duration_s"], detail["actual_duration_s"]) == (3000, 2700)
 
 
 def test_list_counts_exercises_per_workout_and_zero_for_other_sports(
