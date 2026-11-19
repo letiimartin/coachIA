@@ -29,6 +29,8 @@ import PerformanceScreen from './src/screens/performance/PerformanceScreen';
 import CoachChatScreen from './src/screens/coach/CoachChatScreen';
 import IntegrationsScreen from './src/screens/integrations/IntegrationsScreen';
 import StrengthSessionScreen from './src/screens/strength/StrengthSessionScreen';
+import StrengthExercisesScreen from './src/screens/performance/StrengthExercisesScreen';
+import ExerciseProgressScreen from './src/screens/performance/ExerciseProgressScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -55,6 +57,8 @@ const linking = {
       // Vuelta del OAuth de Wahoo (APP_RETURN_URL_* en la API): ?provider=wahoo&status=…&reason=…
       Integrations: 'integrations',
       StrengthSession: 'plan/strength/:id',
+      StrengthExercises: 'performance/strength',
+      ExerciseProgress: 'performance/strength/:id',
     },
   },
 };
@@ -190,6 +194,8 @@ export default function App() {
             <Stack.Screen name="EventForm" component={EventFormScreen} />
             <Stack.Screen name="Integrations" component={IntegrationsScreen} />
             <Stack.Screen name="StrengthSession" component={StrengthSessionScreen} />
+            <Stack.Screen name="StrengthExercises" component={StrengthExercisesScreen} />
+            <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
           </Stack.Navigator>
         ) : (
           <AuthScreen onLogin={() => { }} />

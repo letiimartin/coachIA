@@ -576,6 +576,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/strength/exercises/{exercise_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Exercise Progress
+         * @description Progresión de un ejercicio: una entrada por sesión completada, por fecha.
+         *
+         *     Por sesión: series hechas, repeticiones o segundos totales, peso máximo, volumen (suma de
+         *     repeticiones × peso) y repeticiones (o segundos) de la mejor serie. Sólo cuentan las
+         *     series hechas (`completed`) de sesiones completadas. 404 si el ejercicio no existe.
+         */
+        get: operations["exercise_progress_v1_strength_exercises__exercise_id__progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/strength/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Performed Exercises
+         * @description Ejercicios hechos en sesiones completadas, del último hecho al más antiguo.
+         *
+         *     Cada uno con su número de sesiones, la primera y la última fecha y el peso máximo de la
+         *     última sesión. Vacía si todavía no se ha completado ninguna sesión con series.
+         */
+        get: operations["performed_exercises_v1_strength_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/strength/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Strength Weekly
+         * @description Resumen semanal de fuerza: sesiones, duración y carga `session_rpe` de cada semana.
+         *
+         *     Una semana (de lunes a domingo, días locales) por cada lunes desde la semana de `from`
+         *     hasta la de `to` (rango máximo de 366 días), con 0 en las semanas sin fuerza. Es una
+         *     carga distinta de la de resistencia: no suma en `GET /v1/athlete/fitness`.
+         */
+        get: operations["strength_weekly_v1_strength_weekly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/strength/workouts/{workout_id}": {
         parameters: {
             query?: never;
@@ -1315,6 +1386,110 @@ export interface components {
             slug: string;
         };
         /**
+         * ExerciseProgressOut
+         * @description Historial de un ejercicio: una entrada por sesión completada, de la más antigua a la
+         *     más reciente. Vacío si nunca se ha hecho.
+         * @example {
+         *       "exercise": {
+         *         "aliases": [
+         *           "Sentadilla con barra",
+         *           "Back squat"
+         *         ],
+         *         "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+         *         "mode": "reps",
+         *         "muscle_group": "quadriceps",
+         *         "name": "Sentadilla trasera",
+         *         "origin": "system",
+         *         "slug": "back_squat"
+         *       },
+         *       "sessions": [
+         *         {
+         *           "activity_id": "1f0e2d3c-4b5a-4968-8776-655443322110",
+         *           "best_set_reps": 8,
+         *           "max_weight_kg": 57.5,
+         *           "performed_on": "2026-10-29",
+         *           "planned_workout_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+         *           "sets": 3,
+         *           "total_reps": 24,
+         *           "volume_kg": 1360
+         *         },
+         *         {
+         *           "activity_id": "2e1d3c4b-5a69-4877-8665-544332211009",
+         *           "best_set_reps": 8,
+         *           "max_weight_kg": 60,
+         *           "performed_on": "2026-11-05",
+         *           "planned_workout_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+         *           "sets": 3,
+         *           "total_reps": 24,
+         *           "volume_kg": 1420
+         *         },
+         *         {
+         *           "activity_id": "3d2c4b5a-6978-4866-9554-433221100998",
+         *           "best_set_reps": 8,
+         *           "max_weight_kg": 62.5,
+         *           "performed_on": "2026-11-17",
+         *           "sets": 3,
+         *           "total_reps": 24,
+         *           "volume_kg": 1480
+         *         }
+         *       ]
+         *     }
+         */
+        ExerciseProgressOut: {
+            exercise: components["schemas"]["ExerciseOut"];
+            /** Sessions */
+            sessions: components["schemas"]["ExerciseSessionOut"][];
+        };
+        /**
+         * ExerciseSessionOut
+         * @description Lo hecho con un ejercicio en una sesión completada. Sólo cuentan las series hechas.
+         *
+         *     - `max_weight_kg`: peso máximo de sus series (null si ninguna tiene peso).
+         *     - `volume_kg`: suma de repeticiones × peso de cada serie (con series iguales, series ×
+         *       repeticiones × peso). Null si ninguna serie tiene peso y repeticiones.
+         *     - `best_set_reps`: repeticiones de la mejor serie, la de más peso (a igual peso, la de más
+         *       repeticiones; sin peso, la de más repeticiones). Null en ejercicios por segundos.
+         *     - `best_set_seconds`: igual, en los ejercicios por segundos.
+         */
+        ExerciseSessionOut: {
+            /**
+             * Activity Id
+             * Format: uuid
+             */
+            activity_id: string;
+            /** Best Set Reps */
+            best_set_reps: number | null;
+            /** Best Set Seconds */
+            best_set_seconds: number | null;
+            /** Max Weight Kg */
+            max_weight_kg: number | null;
+            /**
+             * Performed On
+             * Format: date
+             * @description Día local de la sesión.
+             */
+            performed_on: string;
+            /** Planned Workout Id */
+            planned_workout_id: string | null;
+            /**
+             * Sets
+             * @description Series hechas.
+             */
+            sets: number;
+            /**
+             * Total Reps
+             * @description Repeticiones de todas las series.
+             */
+            total_reps: number | null;
+            /**
+             * Total Seconds
+             * @description Segundos de todas las series.
+             */
+            total_seconds: number | null;
+            /** Volume Kg */
+            volume_kg: number | null;
+        };
+        /**
          * FitnessDayOut
          * @description Un día de la serie. Valores redondeados a 1 decimal.
          *
@@ -1511,6 +1686,50 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /**
+         * PerformedExerciseOut
+         * @description Un ejercicio con series hechas en sesiones completadas.
+         *
+         *     `last_max_weight_kg` es el peso máximo de la última sesión (null si no se usó peso).
+         * @example {
+         *       "exercise": {
+         *         "aliases": [
+         *           "Sentadilla con barra",
+         *           "Back squat"
+         *         ],
+         *         "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+         *         "mode": "reps",
+         *         "muscle_group": "quadriceps",
+         *         "name": "Sentadilla trasera",
+         *         "origin": "system",
+         *         "slug": "back_squat"
+         *       },
+         *       "first_performed_on": "2026-10-29",
+         *       "last_max_weight_kg": 62.5,
+         *       "last_performed_on": "2026-11-17",
+         *       "sessions": 3
+         *     }
+         */
+        PerformedExerciseOut: {
+            exercise: components["schemas"]["ExerciseOut"];
+            /**
+             * First Performed On
+             * Format: date
+             */
+            first_performed_on: string;
+            /** Last Max Weight Kg */
+            last_max_weight_kg: number | null;
+            /**
+             * Last Performed On
+             * Format: date
+             */
+            last_performed_on: string;
+            /**
+             * Sessions
+             * @description Sesiones completadas con el ejercicio.
+             */
+            sessions: number;
         };
         /** PingResponse */
         PingResponse: {
@@ -2084,6 +2303,88 @@ export interface components {
         StrengthSetsPut: {
             /** Sets */
             sets: components["schemas"]["StrengthSetIn"][];
+        };
+        /**
+         * StrengthWeeklyOut
+         * @description Una semana por cada lunes desde la semana de `from` hasta la de `to`, por fecha.
+         *
+         *     Las semanas sin fuerza aparecen con todo a 0. La última semana es la que contiene `to`
+         *     (con `to` = hoy, la semana en curso).
+         * @example {
+         *       "from": "2026-10-26",
+         *       "to": "2026-11-19",
+         *       "weeks": [
+         *         {
+         *           "duration_s": 2700,
+         *           "load": 270,
+         *           "sessions": 1,
+         *           "sessions_without_load": 0,
+         *           "week_start": "2026-10-26"
+         *         },
+         *         {
+         *           "duration_s": 5400,
+         *           "load": 495,
+         *           "sessions": 2,
+         *           "sessions_without_load": 0,
+         *           "week_start": "2026-11-02"
+         *         },
+         *         {
+         *           "duration_s": 0,
+         *           "load": 0,
+         *           "sessions": 0,
+         *           "sessions_without_load": 0,
+         *           "week_start": "2026-11-09"
+         *         },
+         *         {
+         *           "duration_s": 5100,
+         *           "load": 330,
+         *           "sessions": 2,
+         *           "sessions_without_load": 1,
+         *           "week_start": "2026-11-16"
+         *         }
+         *       ]
+         *     }
+         */
+        StrengthWeeklyOut: {
+            /**
+             * From
+             * Format: date
+             */
+            from: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+            /** Weeks */
+            weeks: components["schemas"]["StrengthWeekOut"][];
+        };
+        /**
+         * StrengthWeekOut
+         * @description Una semana (de lunes a domingo, días locales del atleta).
+         *
+         *     - `sessions`: actividades de fuerza de la semana (sin duplicados).
+         *     - `duration_s`: suma de su duración.
+         *     - `load`: suma de su carga `session_rpe` (minutos × RPE, Foster), redondeada a 1 decimal.
+         *       Es la carga de fuerza: **no** es TSS y no suma en CTL/ATL/TSB.
+         *     - `sessions_without_load`: sesiones sin RPE, que cuentan en `sessions` y `duration_s`
+         *       pero no en `load`.
+         */
+        StrengthWeekOut: {
+            /** Duration S */
+            duration_s: number;
+            /** Load */
+            load: number;
+            /** Sessions */
+            sessions: number;
+            /** Sessions Without Load */
+            sessions_without_load: number;
+            /**
+             * Week Start
+             * Format: date
+             * @description Lunes de la semana.
+             */
+            week_start: string;
         };
         /**
          * StrengthWorkoutComplete
@@ -4222,6 +4523,154 @@ export interface operations {
             };
             /** @description Recurso no encontrado. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    exercise_progress_v1_strength_exercises__exercise_id__progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseProgressOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    performed_exercises_v1_strength_progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformedExerciseOut"][];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    strength_weekly_v1_strength_weekly_get: {
+        parameters: {
+            query: {
+                /** @description Primer día del rango (incluido). */
+                from: string;
+                /** @description Último día del rango (incluido). */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrengthWeeklyOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
