@@ -79,6 +79,7 @@ def _workout(
     scheduled_on: date = DAY,
     title: str = "Fuerza de piernas",
     exercises: list[PlannedExerciseIn] | None = None,
+    planned_duration_s: int | None = None,
 ) -> uuid.UUID:
     if exercises is None:
         exercises = [
@@ -99,6 +100,7 @@ def _workout(
             title=title,
             exercises=exercises,
             coach_reason="Base de fuerza.",
+            planned_duration_s=planned_duration_s,
         )
         session.commit()
         return workout.id
@@ -209,7 +211,9 @@ def test_list_planned_workouts_by_range(
     engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
 ) -> None:
     inside = _workout(engine, athlete_id, scheduled_on=date(2026, 11, 20), title="B")
-    first = _workout(engine, athlete_id, scheduled_on=date(2026, 11, 18), title="A")
+    first = _workout(
+        engine, athlete_id, scheduled_on=date(2026, 11, 18), title="A", planned_duration_s=2700
+    )
     _workout(engine, athlete_id, scheduled_on=date(2026, 12, 1), title="Fuera")
 
     response = db_client.get(
@@ -223,6 +227,64 @@ def test_list_planned_workouts_by_range(
     assert body[0]["status"] == "planned"
     assert body[0]["coach_reason"] == "Base de fuerza."
     assert body[0]["activity_id"] is None
+    # Resumen sin pedir el detalle (#52): sin duración planificada queda null, no se estima.
+    assert [
+        (item["exercise_count"], item["planned_duration_s"], item["actual_duration_s"])
+        for item in body
+    ] == [(2, 2700, None), (2, None, None)]
+
+
+def test_list_has_the_actual_duration_of_done_workouts(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
+) -> None:
+    """#52: la duración real sale de la actividad, en la misma lista, sólo si está hecho."""
+    done = _workout(engine, athlete_id, title="Hecho", planned_duration_s=3000)
+    _complete(db_client, headers, done, duration_s=2700)
+    pending = _workout(engine, athlete_id, title="Pendiente", planned_duration_s=3000)
+    deleted = _workout(engine, athlete_id, title="Actividad borrada")
+    activity_id = _complete(db_client, headers, deleted).json()["activity_id"]
+    with Session(engine) as session:
+        session.delete(session.get_one(Activity, uuid.UUID(activity_id)))
+        session.commit()
+
+    body = db_client.get(
+        "/v1/planned-workouts", headers=headers, params={"from": DAY, "to": DAY}
+    ).json()
+
+    assert {item["id"]: item["actual_duration_s"] for item in body} == {
+        str(done): 2700,
+        str(pending): None,
+        str(deleted): None,
+    }
+    detail = db_client.get(f"/v1/strength/workouts/{done}", headers=headers).json()
+    assert (detail["planned_duration_s"], detail["actual_duration_s"]) == (3000, 2700)
+
+
+def test_list_counts_exercises_per_workout_and_zero_for_other_sports(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
+) -> None:
+    single = _workout(
+        engine,
+        athlete_id,
+        title="Core",
+        exercises=[PlannedExerciseIn(_exercise_id(engine, "plank"), sets=3, target_seconds=30)],
+    )
+    with Session(engine) as session:
+        run = PlannedWorkout(
+            user_id=athlete_id, sport=Sport.RUNNING, scheduled_on=DAY, title="Rodaje"
+        )
+        session.add(run)
+        session.commit()
+        run_id = run.id
+
+    body = db_client.get(
+        "/v1/planned-workouts", headers=headers, params={"from": DAY, "to": DAY}
+    ).json()
+
+    assert {item["id"]: item["exercise_count"] for item in body} == {
+        str(single): 1,
+        str(run_id): 0,
+    }
 
 
 def test_workout_detail(
@@ -235,6 +297,7 @@ def test_workout_detail(
     assert response.status_code == 200
     body = response.json()
     assert body["title"] == "Fuerza de piernas"
+    assert (body["exercise_count"], body["planned_duration_s"]) == (2, None)
     assert body["set_logs"] == []
     assert body["activity"] is None
     squat, plank = body["exercises"]
@@ -481,6 +544,45 @@ def test_complete_creates_strength_activity_with_session_rpe_load(
         assert session.scalar(count) == 1
 
 
+@pytest.mark.parametrize("rpe", [None, "omitido"], ids=["rpe_null", "sin_rpe"])
+def test_complete_without_rpe_keeps_sets_and_has_no_load(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID, rpe: Any
+) -> None:
+    """#52: sin RPE la sesión queda hecha con sus series, y sin carga (ni 0 ni un RPE por
+    defecto)."""
+    workout_id = _workout(engine, athlete_id)
+    squat, plank = _planned_ids(db_client, headers, workout_id)
+    _put_sets(
+        db_client,
+        headers,
+        workout_id,
+        [
+            {"planned_exercise_id": squat, "set_number": 1, "reps": 8, "weight_kg": 60},
+            {"planned_exercise_id": squat, "set_number": 2, "reps": 8, "weight_kg": 60},
+            {"planned_exercise_id": plank, "set_number": 1, "seconds": 45},
+        ],
+    )
+    body = {"started_at": STARTED_AT, "duration_s": 3000}
+    if rpe is None:
+        body["rpe"] = None
+
+    response = db_client.post(
+        f"/v1/strength/workouts/{workout_id}/complete", headers=headers, json=body
+    )
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["status"] == "done"
+    activity = detail["activity"]
+    assert (activity["rpe"], activity["load"], activity["load_method"]) == (None, None, None)
+    assert activity["elapsed_s"] == 3000
+    assert len(detail["set_logs"]) == 3
+    assert all(log["activity_id"] == activity["id"] for log in detail["set_logs"])
+    with Session(engine) as session:
+        row = session.get_one(Activity, uuid.UUID(activity["id"]))
+        assert (row.rpe, row.load, row.load_method) == (None, None, None)
+
+
 def test_sets_edited_after_completion_keep_the_activity(
     engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
 ) -> None:
@@ -557,6 +659,92 @@ def test_last_log_returns_latest_completed_session(
     ]
 
 
+def test_last_log_before_a_workout(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
+) -> None:
+    """#52: con `before_workout_id`, la última sesión completada anterior a la que se ve."""
+    exercise_id = _exercise_id(engine, "back_squat")
+    url = f"/v1/strength/exercises/{exercise_id}/last-log"
+
+    def session_with(day: date, weight: float, started_at: str | None = None) -> uuid.UUID:
+        workout_id = _workout(engine, athlete_id, scheduled_on=day)
+        squat, _ = _planned_ids(db_client, headers, workout_id)
+        _put_sets(
+            db_client,
+            headers,
+            workout_id,
+            [{"planned_exercise_id": squat, "set_number": 1, "reps": 8, "weight_kg": weight}],
+        )
+        if started_at is not None:
+            _complete(db_client, headers, workout_id, started_at=started_at)
+        return workout_id
+
+    first = session_with(date(2026, 11, 5), 50, "2026-11-05T18:00:00+01:00")
+    second = session_with(date(2026, 11, 12), 55, "2026-11-12T18:00:00+01:00")
+    third = session_with(date(2026, 11, 19), 60, "2026-11-19T18:00:00+01:00")
+    pending = session_with(date(2026, 11, 26), 80)
+
+    def before(workout_id: uuid.UUID) -> Any:
+        response = db_client.get(
+            url, headers=headers, params={"before_workout_id": str(workout_id)}
+        )
+        assert response.status_code == 200
+        return response.json()
+
+    # Una sesión terminada: la anterior, no ella misma ni las posteriores.
+    assert before(second)["planned_workout_id"] == str(first)
+    assert [s["weight_kg"] for s in before(second)["sets"]] == [50.0]
+    assert before(third)["planned_workout_id"] == str(second)
+    assert before(first)["performed_on"] is None
+    assert before(first)["sets"] == []
+    # Una sesión sin terminar: la última completada (sus propias series no cuentan).
+    assert before(pending)["planned_workout_id"] == str(third)
+    # Sin referencia, como antes: la última completada.
+    assert db_client.get(url, headers=headers).json()["planned_workout_id"] == str(third)
+
+
+def test_last_log_before_a_done_workout_whose_activity_was_deleted(
+    engine: Engine, db_client: TestClient, headers: Headers, athlete_id: uuid.UUID
+) -> None:
+    exercise_id = _exercise_id(engine, "back_squat")
+    older = _workout(engine, athlete_id, scheduled_on=date(2026, 11, 12))
+    squat, _ = _planned_ids(db_client, headers, older)
+    _put_sets(
+        db_client, headers, older, [{"planned_exercise_id": squat, "set_number": 1, "reps": 5}]
+    )
+    _complete(db_client, headers, older, started_at="2026-11-12T18:00:00+01:00")
+    viewed = _workout(engine, athlete_id, scheduled_on=DAY)
+    activity_id = _complete(db_client, headers, viewed).json()["activity_id"]
+    with Session(engine) as session:
+        session.delete(session.get_one(Activity, uuid.UUID(activity_id)))
+        session.commit()
+
+    response = db_client.get(
+        f"/v1/strength/exercises/{exercise_id}/last-log",
+        headers=headers,
+        params={"before_workout_id": str(viewed)},
+    )
+
+    assert response.json()["planned_workout_id"] == str(older)
+
+
+def test_last_log_before_an_unknown_workout(
+    engine: Engine,
+    db_client: TestClient,
+    headers: Headers,
+    make_token: TokenFactory,
+    athlete_id: uuid.UUID,
+) -> None:
+    exercise_id = _exercise_id(engine, "back_squat")
+    workout_id = _workout(engine, athlete_id)
+    other = {"Authorization": f"Bearer {make_token(sub=str(uuid.uuid4()))}"}
+    url = f"/v1/strength/exercises/{exercise_id}/last-log"
+
+    for who, workout in ((headers, uuid.uuid4()), (other, workout_id)):
+        response = db_client.get(url, headers=who, params={"before_workout_id": str(workout)})
+        assert response.status_code == 404
+
+
 def test_last_log_of_unknown_exercise(db_client: TestClient, headers: Headers) -> None:
     response = db_client.get(f"/v1/strength/exercises/{uuid.uuid4()}/last-log", headers=headers)
 
@@ -630,6 +818,8 @@ def test_used_exercise_cannot_be_deleted(engine: Engine, athlete_id: uuid.UUID) 
         "VALUES (:u, 'strength', '2026-11-19', 'x', 'later')",
         "INSERT INTO strength_set_logs (user_id, exercise_id, set_number, reps) "
         "SELECT :u, id, 1, 5 FROM exercises WHERE slug = 'plank'",
+        "INSERT INTO planned_workouts (user_id, sport, scheduled_on, title, planned_duration_s) "
+        "VALUES (:u, 'strength', '2026-11-19', 'x', 0)",
     ],
     ids=[
         "coach_sin_dueno",
@@ -638,6 +828,7 @@ def test_used_exercise_cannot_be_deleted(engine: Engine, athlete_id: uuid.UUID) 
         "grupo_no_valido",
         "estado_no_valido",
         "serie_sin_sesion",
+        "duracion_planificada_cero",
     ],
 )
 def test_check_constraints(session: Session, athlete_id: uuid.UUID, statement: str) -> None:

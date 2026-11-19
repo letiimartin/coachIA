@@ -2,13 +2,14 @@
  * Sesión de fuerza (Fuerza 2, #31), con la composición de la v3: etiqueta y título, cifras en tira y
  * ejercicios en filas con filete, sin tarjetas.
  *
- * - Cada ejercicio muestra lo planificado (3 × 10…) y, debajo, la última vez que se hizo.
+ * - Cada ejercicio muestra lo planificado (3 × 10…) y, debajo, la última vez que se hizo antes de esta
+ *   sesión (la API la toma como referencia, también si ya está hecha, #52).
  * - Cada serie se marca como hecha; las repeticiones o segundos vienen precargados con lo planificado y
  *   el peso es opcional. RPE y RIR por serie, ocultos por defecto.
  * - Las series se guardan solas en la API (`PUT /sets`, siempre la lista completa) y en una copia local,
  *   así que se puede dejar a medias y retomar.
- * - Al terminar se envían la hora de inicio, la duración y el RPE; la API crea la actividad de fuerza y
- *   calcula su carga `session_rpe`.
+ * - Al terminar se envían la hora de inicio, la duración y, si se indica, el RPE; la API crea la
+ *   actividad de fuerza y, con RPE, calcula su carga `session_rpe`. Sin RPE no hay carga (#52).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -174,7 +175,7 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
         void save();
       }
       const exerciseIds = [...new Set(w.exercises.map((e) => e.exercise.id))];
-      const results = await Promise.allSettled(exerciseIds.map((exerciseId) => strengthApi.lastLog(exerciseId)));
+      const results = await Promise.allSettled(exerciseIds.map((exerciseId) => strengthApi.lastLog(exerciseId, w.id)));
       if (!mountedRef.current) return;
       const logs: Record<string, ExerciseLastLogOut> = {};
       results.forEach((r) => {
@@ -238,10 +239,10 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
   };
 
   const minutes = /^\d+$/.test(durationMin.trim()) ? Number(durationMin.trim()) : NaN;
-  const finishValid = isValidTime(startTime.trim()) && minutes >= 1 && minutes <= 24 * 60 && sessionRpe != null;
+  const finishValid = isValidTime(startTime.trim()) && minutes >= 1 && minutes <= 24 * 60;
 
   const complete = async () => {
-    if (!finishValid || sessionRpe == null) return;
+    if (!finishValid) return;
     setCompleting(true);
     setError(null);
     try {
@@ -253,7 +254,7 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
       const updated = await strengthApi.complete(id, {
         started_at: localDateTimeToIso(day, startTime.trim()),
         duration_s: minutes * 60,
-        rpe: Number(sessionRpe),
+        rpe: sessionRpe != null ? Number(sessionRpe) : null,
       });
       startedAtRef.current = null;
       serverUpdatedAtRef.current = updated.updated_at;
@@ -270,11 +271,12 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
   };
 
   const activity = workout.activity;
+  // Sin RPE no hay carga: no se muestra ninguna cifra de carga (#52).
   const stats: Stat[] = done
     ? [
         { value: activity?.elapsed_s ? formatDuration(activity.elapsed_s) : '—', caption: 'Duración' },
         { value: activity?.rpe != null ? String(activity.rpe) : '—', caption: 'RPE de la sesión' },
-        { value: activity?.load != null ? String(Math.round(activity.load)) : '—', caption: 'Carga (sRPE)' },
+        ...(activity?.load != null ? [{ value: String(Math.round(activity.load)), caption: 'Carga (sRPE)' }] : []),
       ]
     : [
         { value: String(workout.exercises.length), caption: workout.exercises.length === 1 ? 'Ejercicio' : 'Ejercicios' },
@@ -317,8 +319,6 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
           const list = drafts[planned.id] ?? [];
           const lastLog = lastLogs[planned.exercise.id];
           const last = lastLogLabel(lastLog, workout.id);
-          // Si la última sesión completada es esta misma, la API no da la anterior: no se muestra nada.
-          const lastIsThis = lastLog?.planned_workout_id === workout.id;
           const substituted = list.some((d) => d.exerciseId != null);
           return (
             <View key={planned.id} style={[local.exercise, i > 0 && local.exerciseRuled]}>
@@ -330,7 +330,7 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
                   {planned.notes ? <Text style={styles.muted}>{planned.notes}</Text> : null}
                 </View>
               </View>
-              {lastLogsLoaded && !lastIsThis ? (
+              {lastLogsLoaded ? (
                 <View style={local.last}>
                   <Icon name="lastLog" size={14} color={colors.textSecondary} />
                   <Text style={local.lastText}>{last ? `Última vez · ${last}` : 'Sin registros anteriores'}</Text>
@@ -381,9 +381,9 @@ export default function StrengthSessionScreen({ navigation, route }: Props) {
               <Field label="Duración (min)" value={durationMin} onChangeText={setDurationMin} placeholder="50" keyboardType="number-pad" />
             </View>
           </View>
-          <Chips label="RPE de la sesión (1–10)" options={RPE_OPTIONS} value={sessionRpe} onChange={setSessionRpe} allowNone />
+          <Chips label="RPE de la sesión (1–10, opcional)" options={RPE_OPTIONS} value={sessionRpe} onChange={setSessionRpe} allowNone />
           <Text style={local.hint}>
-            La API calcula la carga de la sesión (minutos × RPE) y crea la actividad de fuerza. Por ahora el contrato exige el RPE para terminar.
+            Con RPE, la API calcula la carga de la sesión (minutos × RPE). Sin RPE, la sesión se guarda como hecha con todas sus series, pero sin carga.
           </Text>
           <View style={local.finishActions}>
             <Button title="Guardar y terminar" onPress={() => void complete()} disabled={!finishValid} loading={completing} />

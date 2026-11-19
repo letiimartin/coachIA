@@ -516,8 +516,9 @@ export interface paths {
          * List Planned Workouts
          * @description Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.
          *
-         *     Sin paginar: el rango máximo es de 366 días. El detalle de una sesión de fuerza está en
-         *     `GET /v1/strength/workouts/{id}`.
+         *     Sin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios, su
+         *     duración planificada (null si no se ha definido) y, si está hecho, la real de su actividad.
+         *     El detalle de una sesión de fuerza está en `GET /v1/strength/workouts/{id}`.
          */
         get: operations["list_planned_workouts_v1_planned_workouts_get"];
         put?: never;
@@ -561,8 +562,10 @@ export interface paths {
          * Exercise Last Log
          * @description Series del ejercicio (peso y repeticiones o segundos) en la última sesión completada.
          *
-         *     Si nunca se ha registrado, `performed_on` es null y `sets` está vacía. 404 si el ejercicio no
-         *     existe.
+         *     Con `before_workout_id`, la última sesión completada **anterior** a ese entreno, sin contarlo:
+         *     si está completado, anterior al inicio de su actividad; si no, cualquiera. Si nunca se ha
+         *     registrado, `performed_on` es null y `sets` está vacía. 404 si el ejercicio o el entreno no
+         *     existen.
          */
         get: operations["exercise_last_log_v1_strength_exercises__exercise_id__last_log_get"];
         put?: never;
@@ -608,7 +611,8 @@ export interface paths {
          * @description Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.
          *
          *     La actividad lleva `sport = strength`, `source = manual`, la duración y el `rpe`; su carga
-         *     es `session_rpe` (minutos × RPE), que no suma en CTL/ATL/TSB. Las series registradas pasan
+         *     es `session_rpe` (minutos × RPE), que no suma en CTL/ATL/TSB. El `rpe` es opcional: sin él
+         *     la sesión queda hecha, pero sin carga. Las series registradas pasan
          *     a la actividad. 409 si el entreno ya está hecho o saltado; 422 `not_strength`.
          */
         post: operations["complete_workout_v1_strength_workouts__workout_id__complete_post"];
@@ -1555,10 +1559,15 @@ export interface components {
          *     - `planned`: pendiente.
          *     - `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).
          *     - `skipped`: no se hizo.
+         *
+         *     `exercise_count`, `planned_duration_s` y `actual_duration_s` resumen la sesión sin pedir su
+         *     detalle. La duración real es la de la actividad que lo cumplió.
          * @example {
          *       "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
          *       "created_at": "2026-11-18T10:00:00Z",
+         *       "exercise_count": 1,
          *       "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+         *       "planned_duration_s": 3000,
          *       "scheduled_on": "2026-11-19",
          *       "sport": "strength",
          *       "status": "planned",
@@ -1570,6 +1579,11 @@ export interface components {
             /** Activity Id */
             activity_id: string | null;
             /**
+             * Actual Duration S
+             * @description Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.
+             */
+            actual_duration_s: number | null;
+            /**
              * Coach Reason
              * @description Por qué lo propone el coach.
              */
@@ -1580,10 +1594,20 @@ export interface components {
              */
             created_at: string;
             /**
+             * Exercise Count
+             * @description Número de ejercicios planificados (0 si no es de fuerza).
+             */
+            exercise_count: number;
+            /**
              * Id
              * Format: uuid
              */
             id: string;
+            /**
+             * Planned Duration S
+             * @description Duración planificada en segundos. Null si no se ha definido (no se estima).
+             */
+            planned_duration_s: number | null;
             /**
              * Scheduled On
              * Format: date
@@ -1942,7 +1966,8 @@ export interface components {
          * StrengthActivityOut
          * @description Actividad creada al completar la sesión, con su carga `session_rpe` (minutos × RPE).
          *
-         *     Esa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB.
+         *     Esa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB. Si la sesión se completó
+         *     sin RPE, `rpe`, `load` y `load_method` son null: no hay carga.
          */
         StrengthActivityOut: {
             /** Elapsed S */
@@ -2064,6 +2089,9 @@ export interface components {
          * StrengthWorkoutComplete
          * @description Completa la sesión: crea la actividad de fuerza (`source = manual`) con su carga
          *     `session_rpe` = minutos × `rpe`.
+         *
+         *     `rpe` es opcional: sin él, la sesión queda hecha con todas sus series, pero la actividad no
+         *     tiene RPE ni carga (no se usa un RPE por defecto ni una carga 0).
          * @example {
          *       "duration_s": 3000,
          *       "rpe": 7,
@@ -2078,9 +2106,9 @@ export interface components {
             duration_s: number;
             /**
              * Rpe
-             * @description RPE de la sesión (1-10).
+             * @description RPE de la sesión (1-10). Null u omitido: sin carga.
              */
-            rpe: number;
+            rpe?: number | null;
             /**
              * Started At
              * Format: date-time
@@ -2094,6 +2122,7 @@ export interface components {
          * @example {
          *       "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
          *       "created_at": "2026-11-18T10:00:00Z",
+         *       "exercise_count": 1,
          *       "exercises": [
          *         {
          *           "exercise": {
@@ -2117,6 +2146,7 @@ export interface components {
          *         }
          *       ],
          *       "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+         *       "planned_duration_s": 3000,
          *       "scheduled_on": "2026-11-19",
          *       "set_logs": [
          *         {
@@ -2142,6 +2172,11 @@ export interface components {
             /** Activity Id */
             activity_id: string | null;
             /**
+             * Actual Duration S
+             * @description Duración real en segundos, de su actividad. Null si no está hecho o la actividad no la tiene.
+             */
+            actual_duration_s: number | null;
+            /**
              * Coach Reason
              * @description Por qué lo propone el coach.
              */
@@ -2152,6 +2187,11 @@ export interface components {
              */
             created_at: string;
             /**
+             * Exercise Count
+             * @description Número de ejercicios planificados (0 si no es de fuerza).
+             */
+            exercise_count: number;
+            /**
              * Exercises
              * @description Por `position`.
              */
@@ -2161,6 +2201,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Planned Duration S
+             * @description Duración planificada en segundos. Null si no se ha definido (no se estima).
+             */
+            planned_duration_s: number | null;
             /**
              * Scheduled On
              * Format: date
@@ -4145,7 +4190,10 @@ export interface operations {
     };
     exercise_last_log_v1_strength_exercises__exercise_id__last_log_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Entreno que se está viendo: devuelve la última sesión completada anterior a él (sin contarlo). */
+                before_workout_id?: string | null;
+            };
             header?: never;
             path: {
                 exercise_id: string;

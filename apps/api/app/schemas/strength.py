@@ -136,6 +136,9 @@ _WORKOUT_EXAMPLE: dict[str, Any] = {
     "title": "Fuerza de piernas",
     "status": "planned",
     "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
+    "exercise_count": 1,
+    "planned_duration_s": 3000,
+    "actual_duration_s": None,
     "activity_id": None,
     "created_at": "2026-11-18T10:00:00Z",
     "updated_at": "2026-11-18T10:00:00Z",
@@ -148,6 +151,9 @@ class PlannedWorkoutOut(BaseModel):
     - `planned`: pendiente.
     - `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).
     - `skipped`: no se hizo.
+
+    `exercise_count`, `planned_duration_s` y `actual_duration_s` resumen la sesión sin pedir su
+    detalle. La duración real es la de la actividad que lo cumplió.
     """
 
     model_config = ConfigDict(
@@ -160,6 +166,16 @@ class PlannedWorkoutOut(BaseModel):
     title: str
     status: PlannedWorkoutStatus
     coach_reason: str | None = Field(description="Por qué lo propone el coach.")
+    exercise_count: int = Field(
+        ge=0, description="Número de ejercicios planificados (0 si no es de fuerza)."
+    )
+    planned_duration_s: int | None = Field(
+        description="Duración planificada en segundos. Null si no se ha definido (no se estima)."
+    )
+    actual_duration_s: int | None = Field(
+        description="Duración real en segundos, de su actividad. Null si no está hecho o la "
+        "actividad no la tiene."
+    )
     activity_id: UUID | None
     created_at: datetime
     updated_at: datetime
@@ -208,7 +224,8 @@ class StrengthSetLogOut(BaseModel):
 class StrengthActivityOut(BaseModel):
     """Actividad creada al completar la sesión, con su carga `session_rpe` (minutos × RPE).
 
-    Esa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB.
+    Esa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB. Si la sesión se completó
+    sin RPE, `rpe`, `load` y `load_method` son null: no hay carga.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -340,7 +357,11 @@ class StrengthSetsPut(BaseModel):
 
 class StrengthWorkoutComplete(BaseModel):
     """Completa la sesión: crea la actividad de fuerza (`source = manual`) con su carga
-    `session_rpe` = minutos × `rpe`."""
+    `session_rpe` = minutos × `rpe`.
+
+    `rpe` es opcional: sin él, la sesión queda hecha con todas sus series, pero la actividad no
+    tiene RPE ni carga (no se usa un RPE por defecto ni una carga 0).
+    """
 
     model_config = ConfigDict(
         extra="forbid",
@@ -351,4 +372,6 @@ class StrengthWorkoutComplete(BaseModel):
 
     started_at: AwareDatetime = Field(description="Inicio de la sesión, con zona horaria.")
     duration_s: int = Field(gt=0, le=86_400, description="Duración en segundos.")
-    rpe: Rpe = Field(description="RPE de la sesión (1-10).")
+    rpe: Rpe | None = Field(
+        default=None, description="RPE de la sesión (1-10). Null u omitido: sin carga."
+    )

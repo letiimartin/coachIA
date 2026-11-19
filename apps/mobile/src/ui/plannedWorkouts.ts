@@ -1,6 +1,5 @@
 // Presentación de los entrenos planificados (Hoy y Plan): icono por disciplina, resumen y entrada de
 // agenda. La fuerza va sin color de zona. Sólo datos de la API: ninguna duración ni carga inventada.
-import { plannedWorkoutsApi, strengthApi } from '../api/strengthApi';
 import type { PlannedWorkoutOut, Sport } from '../api/types';
 import type { AgendaEntry } from './Agenda';
 import type { IconName } from './Icon';
@@ -16,11 +15,6 @@ export const SPORT_ICONS: Record<Sport, IconName> = {
   other: 'sportOther',
 };
 
-/** Datos de la sesión que no vienen en la lista (`GET /v1/planned-workouts`). */
-export type WorkoutSummary = { exerciseCount: number; elapsedS: number | null };
-
-export type PlannedWithSummaries = { workouts: PlannedWorkoutOut[]; summaries: Record<string, WorkoutSummary> };
-
 /** Prefijo de la clave de agenda de un entreno (las de los eventos son su id). */
 export const WORKOUT_KEY_PREFIX = 'workout:';
 
@@ -35,14 +29,19 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
 
-/** «Fuerza · 6 ejercicios · 50 min», con el estado si ya no está pendiente y sin los datos que falten. */
-export function workoutSummary(workout: PlannedWorkoutOut, summary?: WorkoutSummary): string {
-  const count = summary?.exerciseCount;
+/**
+ * «Fuerza · 6 ejercicios · 50 min», con el estado si ya no está pendiente. Todo sale de la lista
+ * (`GET /v1/planned-workouts`, #52): el número de ejercicios y la duración, que es la real (de su
+ * actividad) si la sesión está hecha y la planificada si no, cada una sólo si existe.
+ */
+export function workoutSummary(workout: PlannedWorkoutOut): string {
+  const count = workout.exercise_count;
+  const duration = workout.status === 'done' ? workout.actual_duration_s : workout.planned_duration_s;
   return [
     SPORT_LABELS[workout.sport],
     workout.status === 'done' ? 'hecho' : workout.status === 'skipped' ? 'saltado' : null,
-    count != null ? (count === 1 ? '1 ejercicio' : `${count} ejercicios`) : null,
-    summary?.elapsedS ? formatDuration(summary.elapsedS) : null,
+    workout.sport === 'strength' ? (count === 1 ? '1 ejercicio' : `${count} ejercicios`) : null,
+    duration ? formatDuration(duration) : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -53,11 +52,11 @@ export function hasSessionScreen(workout: PlannedWorkoutOut): boolean {
   return workout.sport === 'strength';
 }
 
-export function workoutToAgendaEntry(workout: PlannedWorkoutOut, summary?: WorkoutSummary, subtitle?: string): AgendaEntry {
+export function workoutToAgendaEntry(workout: PlannedWorkoutOut, subtitle?: string): AgendaEntry {
   return {
     key: `${WORKOUT_KEY_PREFIX}${workout.id}`,
     title: workout.title,
-    subtitle: subtitle ?? workoutSummary(workout, summary),
+    subtitle: subtitle ?? workoutSummary(workout),
     icon: workout.status === 'done' ? 'check' : SPORT_ICONS[workout.sport],
     muted: workout.status !== 'planned',
     disabled: !hasSessionScreen(workout),
@@ -69,19 +68,4 @@ export function workoutsByDay(workouts: PlannedWorkoutOut[], days: string[]): Re
   const map: Record<string, PlannedWorkoutOut[]> = Object.fromEntries(days.map((d) => [d, []]));
   for (const w of workouts) map[w.scheduled_on]?.push(w);
   return map;
-}
-
-/**
- * Entrenos de `[from, to]` y, para los de fuerza, el número de ejercicios y la duración real (si ya se
- * hicieron), que sólo trae el detalle. Si falla un detalle, ese entreno se muestra sin resumen.
- */
-export async function loadPlannedWithSummaries(from: string, to: string): Promise<PlannedWithSummaries> {
-  const workouts = await plannedWorkoutsApi.list(from, to);
-  const strength = workouts.filter((w) => w.sport === 'strength' && w.status !== 'skipped');
-  const details = await Promise.allSettled(strength.map((w) => strengthApi.getWorkout(w.id)));
-  const summaries: Record<string, WorkoutSummary> = {};
-  details.forEach((d) => {
-    if (d.status === 'fulfilled') summaries[d.value.id] = { exerciseCount: d.value.exercises.length, elapsedS: d.value.activity?.elapsed_s ?? null };
-  });
-  return { workouts, summaries };
 }

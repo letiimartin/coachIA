@@ -413,7 +413,9 @@ export const contractExamples: Record<string, unknown[]> = {
     {
       "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
       "created_at": "2026-11-18T10:00:00Z",
+      "exercise_count": 1,
       "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+      "planned_duration_s": 3000,
       "scheduled_on": "2026-11-19",
       "sport": "strength",
       "status": "planned",
@@ -501,6 +503,7 @@ export const contractExamples: Record<string, unknown[]> = {
     {
       "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
       "created_at": "2026-11-18T10:00:00Z",
+      "exercise_count": 1,
       "exercises": [
         {
           "exercise": {
@@ -524,6 +527,7 @@ export const contractExamples: Record<string, unknown[]> = {
         }
       ],
       "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+      "planned_duration_s": 3000,
       "scheduled_on": "2026-11-19",
       "set_logs": [
         {
