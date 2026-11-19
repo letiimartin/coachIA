@@ -38,6 +38,8 @@ function normalizeWorkout(raw: unknown): StrengthWorkoutOut {
   return {
     ...w,
     coach_reason: w.coach_reason ?? null,
+    exercise_count: w.exercises.length,
+    planned_duration_s: w.planned_duration_s ?? null,
     activity_id: w.activity_id ?? null,
     activity: w.activity ?? null,
     exercises: w.exercises.map((e) => ({
@@ -125,15 +127,20 @@ export const strengthMock = {
     const activityId = uuid();
     w.status = 'done';
     w.activity_id = activityId;
-    w.activity = { id: activityId, start_at: body.started_at, elapsed_s: body.duration_s, rpe: body.rpe, load: null, load_method: null };
+    w.activity = { id: activityId, start_at: body.started_at, elapsed_s: body.duration_s, rpe: body.rpe ?? null, load: null, load_method: null };
     w.set_logs = w.set_logs.map((s) => ({ ...s, activity_id: activityId }));
     return delay(w);
   },
 
-  lastLog(exerciseId: string) {
+  /**
+   * El ejemplo del contrato hace de sesión anterior (es de otro día). Comparte el id de la sesión de
+   * ejemplo, así que con `beforeWorkoutId` se devuelve sin ese id, como si fuera otra sesión.
+   */
+  lastLog(exerciseId: string, beforeWorkoutId?: string) {
     if (exampleLastLog && exampleLastLog.exercise.id === exerciseId) {
       const sets = exampleLastLog.sets.map((x) => ({ ...x, reps: x.reps ?? null, seconds: x.seconds ?? null, weight_kg: x.weight_kg ?? null, rpe: x.rpe ?? null, rir: x.rir ?? null }));
-      return delay({ ...exampleLastLog, sets });
+      const sameWorkout = beforeWorkoutId != null && exampleLastLog.planned_workout_id === beforeWorkoutId;
+      return delay({ ...exampleLastLog, planned_workout_id: sameWorkout ? null : exampleLastLog.planned_workout_id, sets });
     }
     const exercise = db.workouts.flatMap((w) => w.exercises).find((e) => e.exercise.id === exerciseId)?.exercise;
     if (!exercise) return Promise.reject(new ApiError(404, 'not_found', 'Ejercicio no encontrado (datos de prueba).'));

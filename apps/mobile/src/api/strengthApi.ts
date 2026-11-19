@@ -35,17 +35,23 @@ export const strengthApi = {
       () => strengthMock.replaceSets(id, sets),
     ),
 
-  /** Cierra la sesión: la API crea la actividad de fuerza y calcula su carga `session_rpe`. */
+  /** Cierra la sesión: la API crea la actividad de fuerza y, si hay RPE, calcula su carga `session_rpe`. */
   complete: (id: string, body: StrengthWorkoutComplete) =>
     withMock(
       () => request<StrengthWorkoutOut>('POST', `${workoutPath(id)}/complete`, { body }),
       () => strengthMock.complete(id, body),
     ),
 
-  /** Series de la última sesión completada con ese ejercicio (`sets` vacía si no hay ninguna). */
-  lastLog: (exerciseId: string) =>
+  /**
+   * Series de la última sesión completada con ese ejercicio (`sets` vacía si no hay ninguna). Con
+   * `beforeWorkoutId`, la última anterior a esa sesión, sin contarla (#52).
+   */
+  lastLog: (exerciseId: string, beforeWorkoutId?: string) =>
     withMock(
-      () => request<ExerciseLastLogOut>('GET', `/v1/strength/exercises/${encodeURIComponent(exerciseId)}/last-log`),
-      () => strengthMock.lastLog(exerciseId),
+      () =>
+        request<ExerciseLastLogOut>('GET', `/v1/strength/exercises/${encodeURIComponent(exerciseId)}/last-log`, {
+          query: beforeWorkoutId ? { before_workout_id: beforeWorkoutId } : undefined,
+        }),
+      () => strengthMock.lastLog(exerciseId, beforeWorkoutId),
     ),
 };

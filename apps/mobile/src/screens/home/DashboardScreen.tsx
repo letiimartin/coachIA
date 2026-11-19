@@ -11,7 +11,8 @@ import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 import { athleteApi, calendarApi } from '../../api/athleteApi';
 import { errorText } from '../../api/errors';
 import { fitnessApi, type FitnessDayOut } from '../../api/fitnessApi';
-import type { CalendarEventOut, ProfileOut } from '../../api/types';
+import { plannedWorkoutsApi } from '../../api/strengthApi';
+import type { CalendarEventOut, PlannedWorkoutOut, ProfileOut } from '../../api/types';
 import { AgendaItems, type AgendaEntry } from '../../ui/Agenda';
 import { daysBetween, localDay, longDayLabel, startOfWeek, WEEKDAY_LETTERS, weekDays } from '../../ui/calendarDates';
 import { EVENT_KIND_ICONS, eventsByDay, raceSummary, toAgendaEntry } from '../../ui/calendarEvents';
@@ -20,13 +21,11 @@ import { addDays, formatDate, todayIsoDate } from '../../ui/dates';
 import { StatStrip } from '../../ui/StatStrip';
 import {
   hasSessionScreen,
-  loadPlannedWithSummaries,
   SPORT_ICONS,
   workoutIdFromKey,
   workoutsByDay,
   workoutSummary,
   workoutToAgendaEntry,
-  type PlannedWithSummaries,
 } from '../../ui/plannedWorkouts';
 import { SPORT_LABELS } from '../../ui/labels';
 import { colors, lines, spacing, typography } from '../../ui/theme';
@@ -42,7 +41,7 @@ type DashboardData = {
   profile: Loaded<ProfileOut>;
   fitness: Loaded<FitnessDayOut | null>;
   events: Loaded<CalendarEventOut[]>;
-  workouts: Loaded<PlannedWithSummaries>;
+  workouts: Loaded<PlannedWorkoutOut[]>;
 };
 
 async function section<T>(promise: Promise<T>): Promise<Loaded<T>> {
@@ -61,7 +60,7 @@ async function loadDashboard(): Promise<DashboardData> {
     section(fitnessApi.getSeries(today, today).then((s) => s.days[s.days.length - 1] ?? null)),
     // Desde el lunes y durante un año: la semana en curso y el próximo objetivo.
     section(calendarApi.listEvents(monday, addDays(today, 365))),
-    section(loadPlannedWithSummaries(monday, addDays(monday, 6))),
+    section(plannedWorkoutsApi.list(monday, addDays(monday, 6))),
   ]);
   return { today, profile, fitness, events, workouts };
 }
@@ -90,8 +89,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const today = data?.today ?? todayIsoDate();
   const profile = data?.profile.ok ? data.profile.value : null;
   const events = data?.events.ok ? data.events.value : [];
-  const workouts = data?.workouts.ok ? data.workouts.value.workouts : [];
-  const summaries = data?.workouts.ok ? data.workouts.value.summaries : {};
+  const workouts = data?.workouts.ok ? data.workouts.value : [];
   const openEvent = (key: string) => {
     const workoutId = workoutIdFromKey(key);
     if (workoutId) {
@@ -123,7 +121,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const weekEvents = events.filter((e) => localDay(e.start_at) <= week[6] && localDay(e.end_at ?? e.start_at) >= week[0]);
   // Lista de la semana: por día, primero los entrenos y después los eventos.
   const weekItems: AgendaEntry[] = week.flatMap((date) => [
-    ...workoutsDay[date].map((w) => workoutToAgendaEntry(w, summaries[w.id], `${longDayLabel(date)} · ${workoutSummary(w, summaries[w.id])}`)),
+    ...workoutsDay[date].map((w) => workoutToAgendaEntry(w, `${longDayLabel(date)} · ${workoutSummary(w)}`)),
     ...weekEvents
       .filter((e) => localDay(e.start_at) === date || (date === week[0] && localDay(e.start_at) < date))
       .map((e) => toAgendaEntry(e, `${longDayLabel(localDay(e.start_at))} · ${toAgendaEntry(e).subtitle}`)),
@@ -132,7 +130,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const todayWorkouts = (workoutsDay[today] ?? []).filter((w) => w.status !== 'skipped');
   const heroWorkout = todayWorkouts.find((w) => w.status === 'planned') ?? todayWorkouts[0] ?? null;
   const otherToday: AgendaEntry[] = [
-    ...todayWorkouts.filter((w) => w !== heroWorkout).map((w) => workoutToAgendaEntry(w, summaries[w.id])),
+    ...todayWorkouts.filter((w) => w !== heroWorkout).map((w) => workoutToAgendaEntry(w)),
     ...todayEvents.map((e) => toAgendaEntry(e)),
   ];
   const nextRace = events.find((e) => e.kind === 'race' && localDay(e.start_at) >= today);
@@ -158,7 +156,7 @@ export default function DashboardScreen({ navigation }: Props) {
             {heroWorkout ? (
               <>
                 <Text style={[local.heroTitle, heroWorkout.status === 'done' && local.heroDone]}>{heroWorkout.title}</Text>
-                <Text style={local.heroText}>{workoutSummary(heroWorkout, summaries[heroWorkout.id])}</Text>
+                <Text style={local.heroText}>{workoutSummary(heroWorkout)}</Text>
               </>
             ) : data.workouts.ok ? (
               <>
