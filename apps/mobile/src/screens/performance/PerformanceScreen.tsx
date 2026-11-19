@@ -1,7 +1,7 @@
 /**
  * Pestaña Rendimiento (propuesta v3, #25): cifras de forma con su variación, gráfica de forma con
- * selector de periodo (`GET /v1/athlete/fitness`) y estados vacíos para lo que aún no tiene
- * endpoint (volumen, tiempo por zonas y actividades, fase 2).
+ * selector de periodo (`GET /v1/athlete/fitness`), el bloque de fuerza separado de la forma (#33) y
+ * estados vacíos para lo que aún no tiene endpoint (volumen, tiempo por zonas y actividades, fase 2).
  */
 import React, { useCallback, useState } from 'react';
 import { Text } from 'react-native';
@@ -15,6 +15,7 @@ import { Row, RowGroup } from '../../ui/Row';
 import { StatStrip, type Stat } from '../../ui/StatStrip';
 import { useFocusLoad } from '../../ui/useAsync';
 import { zoneModelFor } from '../../ui/zoneModel';
+import { StrengthBlock } from './StrengthBlock';
 
 type Props = { navigation: NavigationProp<ParamListBase> };
 
@@ -47,16 +48,15 @@ function change(days: FitnessDayOut[], key: 'ctl' | 'atl' | 'tsb', since: string
 export default function PerformanceScreen({ navigation }: Props) {
   const [period, setPeriod] = useState<Period>('6w');
   const spec = PERIODS.find((p) => p.value === period) ?? PERIODS[1];
-  const load = useCallback(() => {
-    const today = todayIsoDate();
-    return fitnessApi.getSeries(addDays(today, -(spec.days - 1)), today);
-  }, [spec.days]);
+  const today = todayIsoDate();
+  const from = addDays(today, -(spec.days - 1));
+  const load = useCallback(() => fitnessApi.getSeries(from, today), [from, today]);
   const { data, loading, error, setError, reload } = useFocusLoad(load);
 
   const days = data?.days ?? [];
   const last = days[days.length - 1];
   const empty = days.length === 0 || days.every((d) => d.ctl === 0 && d.atl === 0);
-  const isToday = last?.day === todayIsoDate();
+  const isToday = last?.day === today;
   const stats: Stat[] = last
     ? [
         { label: 'Forma', value: number(last.ctl), caption: 'CTL', note: change(days, 'ctl', spec.since) },
@@ -84,6 +84,13 @@ export default function PerformanceScreen({ navigation }: Props) {
           <FitnessChart days={days} endLabel={isToday ? 'HOY' : undefined} />
         </>
       ) : null}
+
+      <StrengthBlock
+        from={from}
+        to={today}
+        onOpenExercise={(item) => navigation.navigate('ExerciseProgress', { id: item.exercise.id, name: item.exercise.name })}
+        onOpenAll={() => navigation.navigate('StrengthExercises')}
+      />
 
       <Section title="Volumen">
         <Text style={styles.muted}>Distancia, tiempo, desnivel y carga frente al mes anterior. Disponible cuando la API exponga las actividades.</Text>

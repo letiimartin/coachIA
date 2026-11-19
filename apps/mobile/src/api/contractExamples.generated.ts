@@ -380,6 +380,53 @@ export const contractExamples: Record<string, unknown[]> = {
       "slug": "back_squat"
     }
   ],
+  "ExerciseProgressOut": [
+    {
+      "exercise": {
+        "aliases": [
+          "Sentadilla con barra",
+          "Back squat"
+        ],
+        "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+        "mode": "reps",
+        "muscle_group": "quadriceps",
+        "name": "Sentadilla trasera",
+        "origin": "system",
+        "slug": "back_squat"
+      },
+      "sessions": [
+        {
+          "activity_id": "1f0e2d3c-4b5a-4968-8776-655443322110",
+          "best_set_reps": 8,
+          "max_weight_kg": 57.5,
+          "performed_on": "2026-10-29",
+          "planned_workout_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "sets": 3,
+          "total_reps": 24,
+          "volume_kg": 1360
+        },
+        {
+          "activity_id": "2e1d3c4b-5a69-4877-8665-544332211009",
+          "best_set_reps": 8,
+          "max_weight_kg": 60,
+          "performed_on": "2026-11-05",
+          "planned_workout_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+          "sets": 3,
+          "total_reps": 24,
+          "volume_kg": 1420
+        },
+        {
+          "activity_id": "3d2c4b5a-6978-4866-9554-433221100998",
+          "best_set_reps": 8,
+          "max_weight_kg": 62.5,
+          "performed_on": "2026-11-17",
+          "sets": 3,
+          "total_reps": 24,
+          "volume_kg": 1480
+        }
+      ]
+    }
+  ],
   "FitnessSeriesOut": [
     {
       "days": [
@@ -407,6 +454,26 @@ export const contractExamples: Record<string, unknown[]> = {
       ],
       "from": "2026-11-10",
       "to": "2026-11-12"
+    }
+  ],
+  "PerformedExerciseOut": [
+    {
+      "exercise": {
+        "aliases": [
+          "Sentadilla con barra",
+          "Back squat"
+        ],
+        "id": "0b7c3f9e-1d2a-4e5b-8c6d-7e8f9a0b1c2d",
+        "mode": "reps",
+        "muscle_group": "quadriceps",
+        "name": "Sentadilla trasera",
+        "origin": "system",
+        "slug": "back_squat"
+      },
+      "first_performed_on": "2026-10-29",
+      "last_max_weight_kg": 62.5,
+      "last_performed_on": "2026-11-17",
+      "sessions": 3
     }
   ],
   "PlannedWorkoutOut": [
@@ -488,6 +555,42 @@ export const contractExamples: Record<string, unknown[]> = {
           "reps": 6,
           "set_number": 2,
           "weight_kg": 60
+        }
+      ]
+    }
+  ],
+  "StrengthWeeklyOut": [
+    {
+      "from": "2026-10-26",
+      "to": "2026-11-19",
+      "weeks": [
+        {
+          "duration_s": 2700,
+          "load": 270,
+          "sessions": 1,
+          "sessions_without_load": 0,
+          "week_start": "2026-10-26"
+        },
+        {
+          "duration_s": 5400,
+          "load": 495,
+          "sessions": 2,
+          "sessions_without_load": 0,
+          "week_start": "2026-11-02"
+        },
+        {
+          "duration_s": 0,
+          "load": 0,
+          "sessions": 0,
+          "sessions_without_load": 0,
+          "week_start": "2026-11-09"
+        },
+        {
+          "duration_s": 5100,
+          "load": 330,
+          "sessions": 2,
+          "sessions_without_load": 1,
+          "week_start": "2026-11-16"
         }
       ]
     }

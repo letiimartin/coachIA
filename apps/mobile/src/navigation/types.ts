@@ -12,6 +12,10 @@ export type RootStackParamList = {
   Integrations: { provider?: string; status?: string; reason?: string } | undefined;
   /** Sesión de fuerza planificada (`planned_workouts.id`). */
   StrengthSession: { id: string };
+  /** Ejercicios de fuerza hechos (Rendimiento, #33). */
+  StrengthExercises: undefined;
+  /** Progresión de un ejercicio (`exercises.id`); `name` sólo para el título mientras carga. */
+  ExerciseProgress: { id: string; name?: string };
 };
 
 /** Las cinco pestañas (#23). Coach es una pestaña, no una pantalla de la pila. */

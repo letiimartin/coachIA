@@ -52,3 +52,10 @@ export type StrengthSetLogOut = S['StrengthSetLogOut'];
 export type StrengthSetsPut = S['StrengthSetsPut'];
 export type StrengthWorkoutComplete = S['StrengthWorkoutComplete'];
 export type StrengthActivityOut = S['StrengthActivityOut'];
+
+// Rendimiento de fuerza (#33).
+export type StrengthWeeklyOut = S['StrengthWeeklyOut'];
+export type StrengthWeekOut = S['StrengthWeekOut'];
+export type PerformedExerciseOut = S['PerformedExerciseOut'];
+export type ExerciseProgressOut = S['ExerciseProgressOut'];
+export type ExerciseSessionOut = S['ExerciseSessionOut'];
