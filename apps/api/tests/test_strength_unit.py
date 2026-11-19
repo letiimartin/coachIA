@@ -157,14 +157,24 @@ def test_sets_put_has_a_limit() -> None:
         {"started_at": "2026-11-19T18:30:00"},
         {"duration_s": 0},
         {"rpe": 0},
-        {"rpe": None},
+        {"rpe": 11},
     ],
-    ids=["sin_zona_horaria", "duracion_cero", "rpe_cero", "sin_rpe"],
+    ids=["sin_zona_horaria", "duracion_cero", "rpe_cero", "rpe_once"],
 )
 def test_complete_validation(values: dict[str, Any]) -> None:
     body = {"started_at": "2026-11-19T18:30:00+01:00", "duration_s": 3000, "rpe": 7, **values}
     with pytest.raises(ValidationError):
         StrengthWorkoutComplete.model_validate(body)
+
+
+@pytest.mark.parametrize("body", [{"rpe": None}, {}], ids=["rpe_null", "sin_rpe"])
+def test_complete_rpe_is_optional(body: dict[str, Any]) -> None:
+    """#52: sin RPE la sesión se completa igual (sin carga)."""
+    complete = StrengthWorkoutComplete.model_validate(
+        {"started_at": "2026-11-19T18:30:00+01:00", "duration_s": 3000, **body}
+    )
+
+    assert complete.rpe is None
 
 
 def test_range_validation() -> None:

@@ -1586,12 +1586,14 @@
         "type": "object"
       },
       "PlannedWorkoutOut": {
-        "description": "Entreno planificado de cualquier disciplina. La fuerza es el primer tipo.\n\n- `planned`: pendiente.\n- `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).\n- `skipped`: no se hizo.",
+        "description": "Entreno planificado de cualquier disciplina. La fuerza es el primer tipo.\n\n- `planned`: pendiente.\n- `done`: hecho; `activity_id` es la actividad que lo cumplió (null si se borró).\n- `skipped`: no se hizo.\n\n`exercise_count` y `planned_duration_s` resumen la sesión sin pedir su detalle. La duración\nreal está en la actividad (`activity_id`) cuando el entreno está hecho.",
         "examples": [
           {
             "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
             "created_at": "2026-11-18T10:00:00Z",
+            "exercise_count": 1,
             "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+            "planned_duration_s": 3000,
             "scheduled_on": "2026-11-19",
             "sport": "strength",
             "status": "planned",
@@ -1629,10 +1631,28 @@
             "title": "Created At",
             "type": "string"
           },
+          "exercise_count": {
+            "description": "Número de ejercicios planificados (0 si no es de fuerza).",
+            "minimum": 0.0,
+            "title": "Exercise Count",
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "planned_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Duración planificada en segundos. Null si no se ha definido (no se estima).",
+            "title": "Planned Duration S"
           },
           "scheduled_on": {
             "description": "Día local para el que está planificado.",
@@ -1663,6 +1683,8 @@
           "title",
           "status",
           "coach_reason",
+          "exercise_count",
+          "planned_duration_s",
           "activity_id",
           "created_at",
           "updated_at"
@@ -2524,7 +2546,7 @@
         "type": "object"
       },
       "StrengthActivityOut": {
-        "description": "Actividad creada al completar la sesión, con su carga `session_rpe` (minutos × RPE).\n\nEsa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB.",
+        "description": "Actividad creada al completar la sesión, con su carga `session_rpe` (minutos × RPE).\n\nEsa carga es de fuerza: no es TSS y no suma nunca en CTL/ATL/TSB. Si la sesión se completó\nsin RPE, `rpe`, `load` y `load_method` son null: no hay carga.",
         "properties": {
           "elapsed_s": {
             "anyOf": [
@@ -2863,7 +2885,7 @@
       },
       "StrengthWorkoutComplete": {
         "additionalProperties": false,
-        "description": "Completa la sesión: crea la actividad de fuerza (`source = manual`) con su carga\n`session_rpe` = minutos × `rpe`.",
+        "description": "Completa la sesión: crea la actividad de fuerza (`source = manual`) con su carga\n`session_rpe` = minutos × `rpe`.\n\n`rpe` es opcional: sin él, la sesión queda hecha con todas sus series, pero la actividad no\ntiene RPE ni carga (no se usa un RPE por defecto ni una carga 0).",
         "examples": [
           {
             "duration_s": 3000,
@@ -2880,11 +2902,19 @@
             "type": "integer"
           },
           "rpe": {
-            "description": "RPE de la sesión (1-10).",
-            "maximum": 10.0,
-            "minimum": 1.0,
-            "title": "Rpe",
-            "type": "integer"
+            "anyOf": [
+              {
+                "description": "Esfuerzo percibido (1-10).",
+                "maximum": 10.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "RPE de la sesión (1-10). Null u omitido: sin carga.",
+            "title": "Rpe"
           },
           "started_at": {
             "description": "Inicio de la sesión, con zona horaria.",
@@ -2895,8 +2925,7 @@
         },
         "required": [
           "started_at",
-          "duration_s",
-          "rpe"
+          "duration_s"
         ],
         "title": "StrengthWorkoutComplete",
         "type": "object"
@@ -2907,6 +2936,7 @@
           {
             "coach_reason": "Semana de base: fuerza máxima con poco volumen para no afectar al rodaje.",
             "created_at": "2026-11-18T10:00:00Z",
+            "exercise_count": 1,
             "exercises": [
               {
                 "exercise": {
@@ -2930,6 +2960,7 @@
               }
             ],
             "id": "4c2b1a09-8f7e-4d6c-9b5a-3e2d1c0b9a8f",
+            "planned_duration_s": 3000,
             "scheduled_on": "2026-11-19",
             "set_logs": [
               {
@@ -2990,6 +3021,12 @@
             "title": "Created At",
             "type": "string"
           },
+          "exercise_count": {
+            "description": "Número de ejercicios planificados (0 si no es de fuerza).",
+            "minimum": 0.0,
+            "title": "Exercise Count",
+            "type": "integer"
+          },
           "exercises": {
             "description": "Por `position`.",
             "items": {
@@ -3002,6 +3039,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "planned_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Duración planificada en segundos. Null si no se ha definido (no se estima).",
+            "title": "Planned Duration S"
           },
           "scheduled_on": {
             "description": "Día local para el que está planificado.",
@@ -3040,6 +3089,8 @@
           "title",
           "status",
           "coach_reason",
+          "exercise_count",
+          "planned_duration_s",
           "activity_id",
           "created_at",
           "updated_at",
@@ -5900,7 +5951,7 @@
     },
     "/v1/planned-workouts": {
       "get": {
-        "description": "Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.\n\nSin paginar: el rango máximo es de 366 días. El detalle de una sesión de fuerza está en\n`GET /v1/strength/workouts/{id}`.",
+        "description": "Entrenos planificados de cualquier disciplina con fecha en `[from, to]`, por fecha.\n\nSin paginar: el rango máximo es de 366 días. Cada entreno trae su número de ejercicios y su\nduración planificada (null si no se ha definido). El detalle de una sesión de fuerza está en\n`GET /v1/strength/workouts/{id}`.",
         "operationId": "list_planned_workouts_v1_planned_workouts_get",
         "parameters": [
           {
@@ -6081,7 +6132,7 @@
     },
     "/v1/strength/exercises/{exercise_id}/last-log": {
       "get": {
-        "description": "Series del ejercicio (peso y repeticiones o segundos) en la última sesión completada.\n\nSi nunca se ha registrado, `performed_on` es null y `sets` está vacía. 404 si el ejercicio no\nexiste.",
+        "description": "Series del ejercicio (peso y repeticiones o segundos) en la última sesión completada.\n\nCon `before_workout_id`, la última sesión completada **anterior** a ese entreno, sin contarlo:\nsi está completado, anterior al inicio de su actividad; si no, cualquiera. Si nunca se ha\nregistrado, `performed_on` es null y `sets` está vacía. 404 si el ejercicio o el entreno no\nexisten.",
         "operationId": "exercise_last_log_v1_strength_exercises__exercise_id__last_log_get",
         "parameters": [
           {
@@ -6092,6 +6143,25 @@
               "format": "uuid",
               "title": "Exercise Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Entreno que se está viendo: devuelve la última sesión completada anterior a él (sin contarlo).",
+            "in": "query",
+            "name": "before_workout_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Entreno que se está viendo: devuelve la última sesión completada anterior a él (sin contarlo).",
+              "title": "Before Workout Id"
             }
           }
         ],
@@ -6239,7 +6309,7 @@
     },
     "/v1/strength/workouts/{workout_id}/complete": {
       "post": {
-        "description": "Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.\n\nLa actividad lleva `sport = strength`, `source = manual`, la duración y el `rpe`; su carga\nes `session_rpe` (minutos × RPE), que no suma en CTL/ATL/TSB. Las series registradas pasan\na la actividad. 409 si el entreno ya está hecho o saltado; 422 `not_strength`.",
+        "description": "Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.\n\nLa actividad lleva `sport = strength`, `source = manual`, la duración y el `rpe`; su carga\nes `session_rpe` (minutos × RPE), que no suma en CTL/ATL/TSB. El `rpe` es opcional: sin él\nla sesión queda hecha, pero sin carga. Las series registradas pasan\na la actividad. 409 si el entreno ya está hecho o saltado; 422 `not_strength`.",
         "operationId": "complete_workout_v1_strength_workouts__workout_id__complete_post",
         "parameters": [
           {

@@ -15,7 +15,7 @@ pieza que usará (y la que usan los tests); no tiene endpoint.
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -120,21 +120,34 @@ def create_exercise(
 # --- Entrenos planificados -------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class PlannedWorkoutSummary:
+    """Entreno planificado con su número de ejercicios (0 si no es de fuerza)."""
+
+    workout: PlannedWorkout
+    exercise_count: int
+
+
 def list_planned_workouts(
     session: Session, user_id: uuid.UUID, start: date, end: date
-) -> list[PlannedWorkout]:
+) -> list[PlannedWorkoutSummary]:
     """Entrenos planificados entre `start` y `end` (incluidos), por fecha y creación."""
-    return list(
-        session.scalars(
-            sa.select(PlannedWorkout)
-            .where(
-                PlannedWorkout.user_id == user_id,
-                PlannedWorkout.scheduled_on >= start,
-                PlannedWorkout.scheduled_on <= end,
-            )
-            .order_by(PlannedWorkout.scheduled_on, PlannedWorkout.created_at, PlannedWorkout.id)
-        )
+    exercise_count = (
+        sa.select(sa.func.count())
+        .where(PlannedStrengthExercise.planned_workout_id == PlannedWorkout.id)
+        .correlate(PlannedWorkout)
+        .scalar_subquery()
     )
+    rows = session.execute(
+        sa.select(PlannedWorkout, exercise_count)
+        .where(
+            PlannedWorkout.user_id == user_id,
+            PlannedWorkout.scheduled_on >= start,
+            PlannedWorkout.scheduled_on <= end,
+        )
+        .order_by(PlannedWorkout.scheduled_on, PlannedWorkout.created_at, PlannedWorkout.id)
+    ).all()
+    return [PlannedWorkoutSummary(workout, count) for workout, count in rows]
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +203,7 @@ def create_strength_workout(
     title: str,
     exercises: Sequence[PlannedExerciseIn],
     coach_reason: str | None = None,
+    planned_duration_s: int | None = None,
 ) -> PlannedWorkout:
     """Crea una sesión de fuerza planificada con sus ejercicios, en orden. Sin commit."""
     ensure_athlete_profile(session, user_id)
@@ -202,6 +216,7 @@ def create_strength_workout(
         scheduled_on=scheduled_on,
         title=title,
         coach_reason=coach_reason,
+        planned_duration_s=planned_duration_s,
         status=PlannedWorkoutStatus.PLANNED,
     )
     session.add(workout)
@@ -390,14 +405,15 @@ def complete_workout(
     *,
     started_at: datetime,
     duration_s: int,
-    rpe: int,
+    rpe: int | None,
 ) -> StrengthWorkoutDetail:
     """Completa la sesión: crea la actividad de fuerza y marca el entreno como hecho.
 
     En la misma transacción: crea la `activity` (`sport = strength`, `source = manual`,
     duración y `rpe`), le asigna las series registradas, marca el entreno `done` con su
     `activity_id` y calcula la carga `session_rpe` con el gancho normal (que regenera la forma
-    desde ese día; la fuerza no suma en CTL/ATL/TSB). 409 si ya está hecho o saltado.
+    desde ese día; la fuerza no suma en CTL/ATL/TSB). Sin `rpe` (#52) no hay carga: queda
+    vacía, sin RPE por defecto. 409 si ya está hecho o saltado.
     """
     workout = _strength_workout(session, user_id, workout_id, for_update=True)
     if workout.status != PlannedWorkoutStatus.PLANNED:
@@ -443,13 +459,57 @@ class ExerciseLastLog:
     sets: list[StrengthSetLog]
 
 
-def last_log(session: Session, user_id: uuid.UUID, exercise_id: uuid.UUID) -> ExerciseLastLog:
+def _before_reference(
+    session: Session, user_id: uuid.UUID, workout_id: uuid.UUID
+) -> list[sa.ColumnElement[bool]]:
+    """Condiciones para quedarse con las sesiones anteriores al entreno `workout_id` (#52).
+
+    Nunca cuenta el propio entreno. Si está completado, la referencia es el inicio de su
+    actividad; si está hecho pero su actividad se borró, el comienzo de su día. Si aún no se ha
+    hecho (o se saltó), cualquier sesión completada es anterior. 404 si no es del atleta.
+    """
+    workout = session.scalar(
+        sa.select(PlannedWorkout).where(
+            PlannedWorkout.id == workout_id, PlannedWorkout.user_id == user_id
+        )
+    )
+    if workout is None:
+        raise NotFoundError("Entreno planificado no encontrado.")
+    conditions: list[sa.ColumnElement[bool]] = [
+        sa.or_(
+            StrengthSetLog.planned_workout_id.is_(None),
+            StrengthSetLog.planned_workout_id != workout.id,
+        )
+    ]
+    if workout.status != PlannedWorkoutStatus.DONE:
+        return conditions
+    reference = None if workout.activity_id is None else session.get(Activity, workout.activity_id)
+    if reference is not None:
+        conditions.append(Activity.start_at < reference.start_at)
+    else:
+        tz = ZoneInfo(athlete_timezone(session, user_id))
+        day_start = datetime.combine(workout.scheduled_on, time.min, tzinfo=tz)
+        conditions.append(Activity.start_at < day_start)
+    return conditions
+
+
+def last_log(
+    session: Session,
+    user_id: uuid.UUID,
+    exercise_id: uuid.UUID,
+    *,
+    before_workout_id: uuid.UUID | None = None,
+) -> ExerciseLastLog:
     """Series del ejercicio en la última sesión completada (con actividad) en que se registró.
 
-    404 si el ejercicio no existe o no es visible para el atleta. Si no hay registros, la fecha
-    es null y no hay series.
+    Con `before_workout_id`, la última anterior a ese entreno (ver `_before_reference`).
+    404 si el ejercicio no existe o no es visible para el atleta, o si el entreno no es suyo.
+    Si no hay registros, la fecha es null y no hay series.
     """
     exercise = get_exercise(session, user_id, exercise_id)
+    conditions = (
+        [] if before_workout_id is None else _before_reference(session, user_id, before_workout_id)
+    )
     latest = session.execute(
         sa.select(Activity.id, Activity.start_at)
         .join(StrengthSetLog, StrengthSetLog.activity_id == Activity.id)
@@ -457,6 +517,7 @@ def last_log(session: Session, user_id: uuid.UUID, exercise_id: uuid.UUID) -> Ex
             StrengthSetLog.user_id == user_id,
             StrengthSetLog.exercise_id == exercise_id,
             Activity.user_id == user_id,
+            *conditions,
         )
         .order_by(Activity.start_at.desc(), Activity.id.desc())
         .limit(1)

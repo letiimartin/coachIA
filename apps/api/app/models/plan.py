@@ -37,6 +37,8 @@ class PlannedWorkout(TimestampMixin, Base):
     )
     # Por qué lo propone el coach (texto para la atleta).
     coach_reason: Mapped[str | None] = mapped_column(sa.Text)
+    # Duración planificada en segundos (#52). Null si no se ha definido: no se estima.
+    planned_duration_s: Mapped[int | None]
     # Actividad que lo cumplió. SET NULL: borrar la actividad no borra el plan.
     activity_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("activities.id", ondelete="SET NULL"), unique=True
@@ -45,4 +47,8 @@ class PlannedWorkout(TimestampMixin, Base):
     __table_args__ = (
         sa.Index("ix_planned_workouts_user_id_scheduled_on", "user_id", "scheduled_on"),
         sa.CheckConstraint("activity_id IS NULL OR status = 'done'", name="activity_done"),
+        sa.CheckConstraint(
+            "planned_duration_s IS NULL OR planned_duration_s BETWEEN 1 AND 86400",
+            name="planned_duration_s",
+        ),
     )
