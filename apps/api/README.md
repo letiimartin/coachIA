@@ -60,6 +60,8 @@ se cambia con `TEST_DB_PORT`. Para empezar de cero, páralo y borra ese director
 | `POST /internal/sync/wahoo` | `X-Internal-API-Key` | Sincroniza todas las integraciones de Wahoo activas (n8n, cada 3 h). Idempotente; con el límite de Wahoo responde `rate_limited: true` y el resto sigue en la próxima ejecución |
 | `GET/POST /webhooks/strava` | token de verificación | Suscripción y eventos de Strava |
 
+**Sincronización de Wahoo** (manual con `POST /v1/integrations/wahoo/sync` y automática con `/internal/sync/wahoo`): la primera, sin cursor, sólo importa los workouts que empezaron en los últimos `WAHOO_INITIAL_SYNC_DAYS` días (183 por defecto, unos 6 meses). Las siguientes son incrementales desde el último inicio importado, con un margen de 7 días. Cambiar la ventana no borra actividades ya importadas.
+
 Todos los errores tienen el formato `{"error": {"code", "message", "details?"}, "request_id"}`. Todas las respuestas llevan la cabecera `X-Request-ID`.
 
 ## Autenticación
@@ -93,4 +95,4 @@ Hay que mantener el servicio actual para conservar la Redirect URI registrada en
 | Start Command | `uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Health Check Path | `/health` |
 
-Variables de entorno: `ENVIRONMENT=production`, `DATABASE_URL` (cadena del *pooler* de Supabase), `SUPABASE_URL`, `INTERNAL_API_KEY`, `TOKEN_ENCRYPTION_KEY`, `OAUTH_STATE_SECRET`, `WAHOO_CLIENT_ID` y `WAHOO_CLIENT_SECRET` (app de **producción** de Wahoo).
+Variables de entorno: `ENVIRONMENT=production`, `DATABASE_URL` (cadena del *pooler* de Supabase), `SUPABASE_URL`, `INTERNAL_API_KEY`, `TOKEN_ENCRYPTION_KEY`, `OAUTH_STATE_SECRET`, `WAHOO_CLIENT_ID` y `WAHOO_CLIENT_SECRET` (app de **producción** de Wahoo). Opcional: `WAHOO_INITIAL_SYNC_DAYS` (ventana de la primera importación, 183 días por defecto).

@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     wahoo_redirect_uri: str = "https://letismartcoach.onrender.com/auth/wahoo/callback"
     wahoo_api_base_url: str = "https://api.wahooligan.com"
     wahoo_scopes: str = "user_read workouts_read workouts_write plans_read plans_write"
+    # La primera importación (sin cursor) sólo trae los workouts de los últimos N días (#63).
+    # 183 días ≈ 6 meses. Las siguientes son incrementales y no dependen de este valor.
+    wahoo_initial_sync_days: int = Field(default=183, ge=1, le=3650)
 
     # Coach (#55). Sin la clave del proveedor, el coach no llama al LLM: los endpoints que lo
     # necesitan responden 503 `coach_unavailable` (el filtro de seguridad funciona igual).

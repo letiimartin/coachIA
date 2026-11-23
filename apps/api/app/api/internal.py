@@ -46,14 +46,16 @@ class InternalSyncOut(BaseModel):
 
 @router.post("/sync/wahoo")
 def sync_wahoo_all(
-    db: DbSession, cipher: TokenCipherDep, client: WahooClientDep
+    db: DbSession, cipher: TokenCipherDep, client: WahooClientDep, settings: SettingsDep
 ) -> InternalSyncOut:
     """Sincroniza las actividades de todas las integraciones de Wahoo activas (para n8n).
 
     Si Wahoo aplica el límite de peticiones se detiene (`rate_limited`): el resto de usuarios se
     sincroniza en la siguiente ejecución, empezando por los que llevan más tiempo sin hacerlo.
     """
-    outcome = wahoo_sync.sync_all(db, cipher, client)
+    outcome = wahoo_sync.sync_all(
+        db, cipher, client, initial_sync_days=settings.wahoo_initial_sync_days
+    )
     return InternalSyncOut(
         integrations=outcome.integrations,
         succeeded=outcome.succeeded,
