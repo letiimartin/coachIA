@@ -1,8 +1,9 @@
 # Evaluación del coach (#55)
 
-Set versionado de 20 casos para elegir el modelo del coach y decidir si merece la pena separar el
-modelo que conversa del que prepara las propuestas de adaptación. **El CI no lo ejecuta** (sólo
-comprueba, con un proveedor simulado, que el set es válido y que el script funciona).
+Set versionado de 20 casos para comparar modelos. El coach conversa con `claude-haiku-5-5`
+(decisión de la autora en #55); la evaluación sirve para decidir en la fase 4 (#57) si el
+entrenador que prepara las propuestas de adaptación usa otro modelo. **El CI no lo ejecuta**
+(sólo comprueba, con un proveedor simulado, que el set es válido y que el script funciona).
 
 - `cases.json`: los casos. Cada uno lleva el contexto simulado que devuelven las herramientas
   (`base_context` más los cambios del caso), la conversación previa y lo que se espera de la

@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # Coach (#55). Sin la clave del proveedor, el coach no llama al LLM: los endpoints que lo
     # necesitan responden 503 `coach_unavailable` (el filtro de seguridad funciona igual).
     anthropic_api_key: SecretStr | None = None
-    # Modelo económico por defecto, provisional hasta la evaluación (`evals/coach`).
+    # Modelo que conversa: decisión de la autora (#55). Económico, dentro del límite mensual.
     coach_model: str = "claude-haiku-5-5"
     # Modelo de los resúmenes de conversación. Por defecto, el mismo que conversa.
     coach_summary_model: str | None = None
