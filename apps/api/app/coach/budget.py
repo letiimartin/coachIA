@@ -2,7 +2,8 @@
 
 El límite está en el código: antes de cada llamada se suma el coste de todas las llamadas del
 mes (`coach_llm_calls`: conversación, resúmenes y, más adelante, el planificador). Al llegar al
-80 % hay aviso; al 100 % el coach responde con un mensaje fijo y no llama al LLM.
+80 % y al 100 % se avisa a los desarrolladores (`budget_alerts`, vía n8n), nunca a la atleta; al
+100 % el coach responde con un mensaje fijo y no llama al LLM.
 
 El coste se calcula con los precios oficiales configurados (USD por millón de tokens) y se pasa
 a euros con `coach_usd_to_eur`. El mes es el natural en la zona horaria de la atleta.

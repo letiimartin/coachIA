@@ -4,6 +4,8 @@ from app.models.activity import Activity, ActivitySource, LoadMethod
 from app.models.athlete import AthleteProfile, AthleteThreshold, AvailabilitySlot
 from app.models.calendar import CalendarEvent, EventKind, Race, RacePriority, TrainingImpact
 from app.models.coach import (
+    BudgetThreshold,
+    CoachBudgetAlert,
     CoachConversation,
     CoachLlmCall,
     CoachMemory,
@@ -36,7 +38,9 @@ __all__ = [
     "AthleteProfile",
     "AthleteThreshold",
     "AvailabilitySlot",
+    "BudgetThreshold",
     "CalendarEvent",
+    "CoachBudgetAlert",
     "CoachConversation",
     "CoachLlmCall",
     "CoachMemory",

@@ -44,6 +44,26 @@ class VersionedWorkflowsTest(unittest.TestCase):
         self.assertEqual(node["parameters"]["url"], "={{ $env.API_BASE_URL }}/internal/ping")
 
 
+    def test_budget_alerts_is_inactive_and_emails_from_env(self) -> None:
+        workflow = _load("budget-alerts.json")
+        self.assertIs(workflow["active"], False)
+        urls = [
+            n["parameters"]["url"]
+            for n in workflow["nodes"]
+            if n["type"] == "n8n-nodes-base.httpRequest"
+        ]
+        self.assertEqual(
+            urls,
+            [
+                "={{ $env.API_BASE_URL }}/internal/coach/budget-alerts",
+                "={{ $env.API_BASE_URL }}/internal/coach/budget-alerts/sent",
+            ],
+        )
+        email = next(n for n in workflow["nodes"] if n["type"] == wf.EMAIL_NODE_TYPE)
+        self.assertEqual(email["parameters"]["toEmail"], "={{ $env.COACH_ALERTS_EMAIL_TO }}")
+        self.assertEqual(set(email["credentials"]), {"smtp"})
+
+
 class CheckWorkflowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.workflow = _load("sync-wahoo.json")
@@ -106,6 +126,13 @@ class CheckWorkflowTest(unittest.TestCase):
     def test_literal_value_in_sensitive_field_is_rejected(self) -> None:
         self.workflow["nodes"][0]["parameters"]["apiKey"] = "clave-de-prueba"
         self.assert_problem(self.workflow, "campo sensible")
+
+    def test_literal_email_address_is_rejected(self) -> None:
+        workflow = _load("budget-alerts.json")
+        email = next(n for n in workflow["nodes"] if n["type"] == wf.EMAIL_NODE_TYPE)
+        email["parameters"]["toEmail"] = "alguien@ejemplo.es"
+        self.assert_problem(workflow, "dirección de correo literal")
+        self.assert_problem(workflow, "variable de entorno ($env)")
 
     def test_pinned_data_is_rejected(self) -> None:
         self.workflow["pinData"] = {"Ejecutar a mano": [{"json": {"token": "x"}}]}

@@ -14,6 +14,7 @@ cabecera `X-Internal-API-Key`, y se versionan aquí en JSON.
 | `.env.example` | Variables del compose (sin secretos) |
 | `workflows/ping.json` | Disparador manual → `GET {API_BASE_URL}/internal/ping`: comprueba la conexión y la clave |
 | `workflows/sync-wahoo.json` | Cron cada 3 h (y disparador manual) → `POST {API_BASE_URL}/internal/sync/wahoo` |
+| `workflows/budget-alerts.json` | Cron cada hora (y disparador manual) → avisos de gasto del LLM por email (ver abajo) |
 | `n8n_workflows.py` | Comprueba los JSON (lo usa el CI) y normaliza las exportaciones de n8n |
 
 ## 1. Levantar la API local con una clave de prueba
@@ -51,7 +52,7 @@ propietario local. Para pararlo: `$C down` (los datos siguen en el volumen `n8n_
 `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`: las expresiones pueden leer las variables de entorno del contenedor, así
 que no metas en él más secretos que los imprescindibles.
 
-## 3. Crear la credencial
+## 3. Crear las credenciales
 
 La clave interna nunca va dentro del JSON del workflow: es una credencial de n8n, cifrada en su volumen.
 
@@ -73,6 +74,11 @@ printf '[{"id":"coachiainternal1","name":"CoachIA API interna","type":"httpHeade
 
 La clave se lee de la entrada estándar: no queda en ningún fichero ni en el repositorio.
 
+**SMTP (sólo para `budget-alerts.json`):** *Credentials → Add credential → SMTP*, con el nombre `CoachIA SMTP`
+(el workflow la referencia con el id `coachiasmtp00001`) y el servidor de correo que elija la autora. Para
+probar en local sin enviar correos de verdad sirve un servidor SMTP falso (por ejemplo Mailpit). Las
+direcciones van en `COACH_ALERTS_EMAIL_FROM` y `COACH_ALERTS_EMAIL_TO` de `.env`.
+
 ## 4. Importar los workflows
 
 ```bash
@@ -85,6 +91,7 @@ Se importan inactivos. Para probarlos: ábrelos y pulsa *Execute workflow*, o de
 ```bash
 $C exec -T -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id coachiaping00001
 $C exec -T -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id coachiasyncwahoo
+$C exec -T -e N8N_RUNNERS_BROKER_PORT=5690 n8n n8n execute --id coachiabudgetalr
 ```
 
 ## 5. Exportar los cambios al repositorio
@@ -101,8 +108,9 @@ git diff automation/n8n/workflows
 
 Antes de subirlo: `python3 automation/n8n/n8n_workflows.py check` (lo mismo que el CI,
 `.github/workflows/automation.yml`). Comprueba que cada JSON es válido y está inactivo, que no lleva datos
-fijados ni cabeceras, que las llamadas HTTP usan `{{ $env.API_BASE_URL }}` y la credencial de cabecera, y que
-no hay URLs que no sean locales ni nada con forma de clave o token.
+fijados ni cabeceras, que las llamadas HTTP usan `{{ $env.API_BASE_URL }}` y la credencial de cabecera, que los
+emails toman las direcciones de `$env`, y que no hay URLs que no sean locales, direcciones de correo ni nada con
+forma de clave o token.
 
 ## Sync de Wahoo: cómo trata cada resultado
 
@@ -121,6 +129,31 @@ Las ejecuciones con error quedan registradas en *Executions* (se guardan una sem
 idempotente: repetirla no duplica actividades. No hay reintentos dentro de la ejecución; el siguiente intento
 es la ejecución programada siguiente.
 
+## Avisos de gasto del LLM
+
+El gasto del LLM es cosa del equipo, no de la atleta (#61). Cuando el gasto del mes de una atleta cruza el
+**80 %** y el **100 %** del límite mensual (`COACH_MONTHLY_BUDGET_EUR`, 4 € por defecto), se envía un email a los
+desarrolladores, **una vez por umbral y mes**. La lógica está en la API; el workflow sólo la orquesta:
+
+1. `GET /internal/coach/budget-alerts` devuelve los avisos pendientes (umbrales cruzados este mes, en la zona
+   horaria de la atleta, y aún no enviados). Cada aviso trae su `key`, las cifras (mes, gasto, límite, llamadas
+   y desglose por modelo) y el email ya redactado (`subject`, `text`). Nunca lleva contenido de las
+   conversaciones ni datos de salud; identifica a la atleta sólo por su id.
+2. El workflow envía un email por aviso (credencial SMTP) y, si se envía, lo confirma con
+   `POST /internal/coach/budget-alerts/sent` (`{"keys": [...]}`). La API lo registra en `coach_budget_alerts`
+   y deja de devolverlo. Sólo registra avisos pendientes: una clave de un umbral aún no cruzado se ignora.
+
+| Resultado | Rama del workflow | Estado de la ejecución |
+|---|---|---|
+| API caída o HTTP distinto de 200 | *Error: API no disponible* / *Error: respuesta de la API* | error |
+| No hay avisos | *Sin avisos* | correcto |
+| El email falla | *Error: email no enviado*: no se confirma, se reintenta en la próxima ejecución | error |
+| El email sale pero la confirmación falla | *Error: confirmación no registrada*: el aviso puede repetirse | error |
+| Todo bien | *Aviso enviado* | correcto |
+
+Al llegar al 100 % el coach deja de llamar al LLM (como antes) y la atleta ve un mensaje neutro, sin cifras.
+
 ## Decisiones pendientes (de la autora)
 - Dónde se aloja n8n (Railway, Render…) y la frecuencia final del sync (por defecto, cada 3 h).
-- Activar el cron contra producción.
+- Activar los cron contra producción.
+- Avisos de gasto: el servidor SMTP (o servicio de envío) y las direcciones de `COACH_ALERTS_EMAIL_*`.

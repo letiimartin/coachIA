@@ -28,7 +28,8 @@ class BudgetOut(BaseModel):
     """Presupuesto mensual del LLM (todas las llamadas del mes, en euros).
 
     - `ok`: por debajo del aviso.
-    - `warning`: se ha pasado el aviso (80 % por defecto); la app lo muestra a la atleta.
+    - `warning`: se ha pasado el aviso (80 % por defecto). El aviso es para los
+      desarrolladores (#61, por n8n): la app no lo muestra a la atleta.
     - `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar
       al LLM hasta el mes siguiente.
     """

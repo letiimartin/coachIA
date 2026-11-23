@@ -9,13 +9,15 @@
   seguridad o el límite de presupuesto (las dos últimas son fijas y no llaman al LLM).
 - `coach_llm_calls`: cada llamada al LLM con sus tokens y su coste. Es la fuente del
   presupuesto mensual: cuenta la conversación, los resúmenes y, más adelante, el planificador.
+- `coach_budget_alerts`: avisos de gasto enviados a los desarrolladores (#61), uno por atleta,
+  mes y umbral (80 % y 100 % del límite), para no repetirlos.
 - `coach_memory`: objetivos y preferencias. El coach sólo las **propone**; pasan a la memoria
   cuando la atleta las confirma (o las añade ella).
 """
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -56,6 +58,13 @@ class LlmCallPurpose(enum.StrEnum):
     CHAT = "chat"
     SUMMARY = "summary"
     PLANNER = "planner"
+
+
+class BudgetThreshold(enum.StrEnum):
+    """Umbral del presupuesto mensual que dispara un aviso a los desarrolladores."""
+
+    WARNING = "warning"  # Aviso (80 % del límite por defecto).
+    LIMIT = "limit"  # 100 %: el coach deja de llamar al LLM.
 
 
 class MemoryKind(enum.StrEnum):
@@ -172,6 +181,33 @@ class CoachLlmCall(Base):
             name="tokens",
         ),
         sa.CheckConstraint("cost_usd >= 0 AND cost_eur >= 0", name="cost"),
+    )
+
+
+class CoachBudgetAlert(Base):
+    """Aviso de gasto enviado a los desarrolladores (n8n confirma el envío).
+
+    Sólo guarda cifras: nunca contenido de las conversaciones ni datos de salud.
+    """
+
+    __tablename__ = "coach_budget_alerts"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = user_fk()
+    month: Mapped[date] = mapped_column(sa.Date)  # Primer día del mes (zona de la atleta).
+    threshold: Mapped[BudgetThreshold] = mapped_column(
+        str_enum(BudgetThreshold, "budget_threshold")
+    )
+    # Gasto del mes cuando se envió el aviso.
+    spent_eur: Mapped[Decimal] = mapped_column(sa.Numeric(12, 6))
+    sent_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("user_id", "month", "threshold"),
+        sa.CheckConstraint("extract(day from month) = 1", name="month_start"),
+        sa.CheckConstraint("spent_eur >= 0", name="spent"),
     )
 
 
