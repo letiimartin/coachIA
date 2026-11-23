@@ -68,6 +68,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/coach/budget-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Budget Alerts
+         * @description Avisos de gasto del LLM pendientes (para n8n): umbrales del 80 % y del 100 % del límite
+         *     mensual cruzados este mes y aún no enviados. Uno por atleta, mes y umbral.
+         *
+         *     n8n envía cada aviso por email y después confirma el envío con `POST .../sent`; hasta
+         *     entonces el aviso sigue apareciendo aquí.
+         */
+        get: operations["list_budget_alerts_internal_coach_budget_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/coach/budget-alerts/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Budget Alerts Sent
+         * @description Registra como enviados los avisos con esas claves, para no repetirlos.
+         *
+         *     Sólo se registran avisos pendientes: las claves ya registradas, de otro mes o de un umbral
+         *     no cruzado se ignoran (`ignored`).
+         */
+        post: operations["mark_budget_alerts_sent_internal_coach_budget_alerts_sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/ping": {
         parameters: {
             query?: never;
@@ -592,8 +639,10 @@ export interface paths {
         };
         /**
          * Get Status
-         * @description Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes
-         *     (con el aviso del 80 %).
+         * @description Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes.
+         *
+         *     La app sólo usa `budget.state == exhausted` para saber si el coach puede responder; las
+         *     cifras no se muestran a la atleta (los avisos de gasto van a los desarrolladores, #61).
          */
         get: operations["get_status_v1_coach_status_get"];
         put?: never;
@@ -1029,11 +1078,74 @@ export interface components {
             weekday: number;
         };
         /**
+         * BudgetAlertOut
+         * @description Aviso de gasto del LLM para los desarrolladores. Sólo cifras: nunca contenido de las
+         *     conversaciones ni datos de salud. `subject` y `text` son el email ya redactado.
+         */
+        BudgetAlertOut: {
+            /** By Model */
+            by_model: components["schemas"]["ModelUsageOut"][];
+            /** Calls */
+            calls: number;
+            /**
+             * Key
+             * @description Identifica el aviso; se envía a `/sent` tras mandarlo.
+             */
+            key: string;
+            /** Limit Eur */
+            limit_eur: number;
+            /**
+             * Month
+             * Format: date
+             * @description Primer día del mes (zona horaria de la atleta).
+             */
+            month: string;
+            /** Percent */
+            percent: number;
+            /** Spent Eur */
+            spent_eur: number;
+            /** Subject */
+            subject: string;
+            /** Text */
+            text: string;
+            /**
+             * Threshold
+             * @description `warning`: umbral de aviso (80 % por defecto). `limit`: 100 %.
+             * @enum {string}
+             */
+            threshold: "warning" | "limit";
+            /** Threshold Eur */
+            threshold_eur: number;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** BudgetAlertsOut */
+        BudgetAlertsOut: {
+            /** Alerts */
+            alerts: components["schemas"]["BudgetAlertOut"][];
+        };
+        /** BudgetAlertsSent */
+        BudgetAlertsSent: {
+            /** Keys */
+            keys: string[];
+        };
+        /** BudgetAlertsSentOut */
+        BudgetAlertsSentOut: {
+            /** Ignored */
+            ignored: number;
+            /** Recorded */
+            recorded: number;
+        };
+        /**
          * BudgetOut
          * @description Presupuesto mensual del LLM (todas las llamadas del mes, en euros).
          *
          *     - `ok`: por debajo del aviso.
-         *     - `warning`: se ha pasado el aviso (80 % por defecto); la app lo muestra a la atleta.
+         *     - `warning`: se ha pasado el aviso (80 % por defecto). El aviso es para los
+         *       desarrolladores (#61, por n8n): la app no lo muestra a la atleta.
          *     - `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar
          *       al LLM hasta el mes siguiente.
          * @example {
@@ -2115,6 +2227,15 @@ export interface components {
          * @enum {string}
          */
         MessageRole: "user" | "assistant" | "tool" | "system";
+        /** ModelUsageOut */
+        ModelUsageOut: {
+            /** Calls */
+            calls: number;
+            /** Cost Eur */
+            cost_eur: number;
+            /** Model */
+            model: string;
+        };
         /**
          * MuscleGroup
          * @description Grupo muscular principal del ejercicio.
@@ -3553,6 +3674,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    list_budget_alerts_internal_coach_budget_alerts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-internal-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetAlertsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_budget_alerts_sent_internal_coach_budget_alerts_sent_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-internal-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetAlertsSent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetAlertsSentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

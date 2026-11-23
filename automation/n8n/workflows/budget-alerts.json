@@ -1,0 +1,501 @@
+{
+  "id": "coachiabudgetalr",
+  "name": "CoachIA · Avisos de gasto del LLM (cada hora)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e01",
+      "name": "Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "17 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e02",
+      "name": "Ejecutar a mano",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e03",
+      "name": "GET /internal/coach/budget-alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/internal/coach/budget-alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coachiainternal1",
+          "name": "CoachIA API interna"
+        }
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e04",
+      "name": "Clasificar respuesta",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-1",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "notEquals"
+                    },
+                    "rightValue": 200
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "error_api"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-2",
+                    "leftValue": "={{ $json.body.alerts.length }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 0
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sin_avisos"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "avisos"
+        }
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e05",
+      "name": "Error: API no disponible",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "errorMessage": "=Avisos de gasto: no se pudo llamar a la API ({{ $json.error?.message ?? $json.error ?? 'error de red' }})."
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e06",
+      "name": "Error: respuesta de la API",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        760,
+        -200
+      ],
+      "parameters": {
+        "errorMessage": "=Avisos de gasto: la API respondió {{ $json.statusCode }} ({{ $json.body?.error?.code ?? 'sin código' }}: {{ $json.body?.error?.message ?? '' }}). request_id: {{ $json.body?.request_id ?? $json.headers?.['x-request-id'] ?? '-' }}"
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e07",
+      "name": "Sin avisos",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        -40
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "status",
+              "type": "string",
+              "value": "sin_avisos"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e08",
+      "name": "Separar avisos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        760,
+        140
+      ],
+      "parameters": {
+        "fieldToSplitOut": "body.alerts",
+        "options": {}
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e09",
+      "name": "Enviar email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        140
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "fromEmail": "={{ $env.COACH_ALERTS_EMAIL_FROM }}",
+        "toEmail": "={{ $env.COACH_ALERTS_EMAIL_TO }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "coachiasmtp00001",
+          "name": "CoachIA SMTP"
+        }
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e10",
+      "name": "Error: email no enviado",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        320
+      ],
+      "parameters": {
+        "errorMessage": "=Avisos de gasto: no se pudo enviar el email ({{ $json.error?.message ?? $json.error ?? 'error del servidor de correo' }}). Se reintenta en la próxima ejecución."
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e11",
+      "name": "POST /internal/coach/budget-alerts/sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        60
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/internal/coach/budget-alerts/sent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ keys: [$('Separar avisos').item.json.key] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coachiainternal1",
+          "name": "CoachIA API interna"
+        }
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e12",
+      "name": "Comprobar confirmación",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1480,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-3",
+              "leftValue": "={{ $json.statusCode }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 200
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e13",
+      "name": "Aviso enviado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1720,
+        -20
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "status",
+              "type": "string",
+              "value": "enviado"
+            },
+            {
+              "id": "a2",
+              "name": "key",
+              "type": "string",
+              "value": "={{ $('Separar avisos').item.json.key }}"
+            },
+            {
+              "id": "a3",
+              "name": "result",
+              "type": "object",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7c4d2e9a-3b1f-4e6a-8d5c-2a9b0c1d3e14",
+      "name": "Error: confirmación no registrada",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        160
+      ],
+      "parameters": {
+        "errorMessage": "=Avisos de gasto: el email se envió pero la API no registró el envío ({{ $json.statusCode ?? $json.error?.message ?? 'error de red' }}); el aviso puede repetirse en la próxima ejecución."
+      }
+    }
+  ],
+  "connections": {
+    "Cada hora": {
+      "main": [
+        [
+          {
+            "node": "GET /internal/coach/budget-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar a mano": {
+      "main": [
+        [
+          {
+            "node": "GET /internal/coach/budget-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /internal/coach/budget-alerts": {
+      "main": [
+        [
+          {
+            "node": "Clasificar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: API no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Error: respuesta de la API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin avisos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Separar avisos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar avisos": {
+      "main": [
+        [
+          {
+            "node": "Enviar email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar email": {
+      "main": [
+        [
+          {
+            "node": "POST /internal/coach/budget-alerts/sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: email no enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /internal/coach/budget-alerts/sent": {
+      "main": [
+        [
+          {
+            "node": "Comprobar confirmación",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: confirmación no registrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar confirmación": {
+      "main": [
+        [
+          {
+            "node": "Aviso enviado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error: confirmación no registrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "tags": []
+}

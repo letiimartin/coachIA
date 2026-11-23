@@ -3,8 +3,9 @@
 
     python3 automation/n8n/n8n_workflows.py check
         Valida todos los JSON (lo ejecuta el CI): JSON válido, `active: false`, sin datos fijados,
-        las llamadas a la API usan `$env.API_BASE_URL` y la credencial de cabecera, y no hay claves,
-        tokens ni URLs de producción.
+        las llamadas a la API usan `$env.API_BASE_URL` y la credencial de cabecera, los emails toman
+        las direcciones de variables de entorno, y no hay claves, tokens, direcciones de correo ni
+        URLs de producción.
 
     <exportación de n8n> | python3 automation/n8n/n8n_workflows.py normalize
         Lee de stdin la salida de `n8n export:workflow --all` y escribe cada workflow en
@@ -32,6 +33,9 @@ CREDENTIAL_TYPE = "httpHeaderAuth"
 # Hosts que pueden aparecer literalmente (ejemplos y valores por defecto locales).
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "host.docker.internal"}
 
+EMAIL_NODE_TYPE = "n8n-nodes-base.emailSend"
+EMAIL_ADDRESS_FIELDS = ("fromEmail", "toEmail", "ccEmail", "bccEmail", "replyTo")
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 URL_RE = re.compile(r"https?://([^/\s:'\"}]+)", re.IGNORECASE)
 SECRET_PATTERNS = {
     "JWT": re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
@@ -91,6 +95,8 @@ def check_workflow(workflow: Any) -> list[str]:
         for host in URL_RE.findall(text):
             if host.lower() not in LOCAL_HOSTS:
                 problems.append(f"{path}: URL no local ({host}); usa {{{{ $env.API_BASE_URL }}}}")
+        if EMAIL_RE.search(text):
+            problems.append(f"{path}: dirección de correo literal; usa una variable de entorno")
         for label, pattern in SECRET_PATTERNS.items():
             if pattern.search(text):
                 problems.append(f"{path}: parece contener un secreto ({label})")
@@ -110,6 +116,15 @@ def _check_node(node: Any) -> list[str]:
             problems.append(
                 f"nodo {name!r}: la credencial {cred_type} sólo puede referenciarse por id y nombre"
             )
+    if node.get("type") == EMAIL_NODE_TYPE:
+        params = node.get("parameters") or {}
+        for field in EMAIL_ADDRESS_FIELDS:
+            value = params.get(field)
+            if value and not (isinstance(value, str) and value.startswith("={{ $env.")):
+                problems.append(
+                    f"nodo {name!r}: `{field}` debe salir de una variable de entorno ($env)"
+                )
+        return problems
     if node.get("type") != "n8n-nodes-base.httpRequest":
         return problems
     params = node.get("parameters") or {}

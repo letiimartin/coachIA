@@ -183,8 +183,141 @@
         "title": "AvailabilityDay",
         "type": "object"
       },
+      "BudgetAlertOut": {
+        "description": "Aviso de gasto del LLM para los desarrolladores. Sólo cifras: nunca contenido de las\nconversaciones ni datos de salud. `subject` y `text` son el email ya redactado.",
+        "properties": {
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageOut"
+            },
+            "title": "By Model",
+            "type": "array"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "key": {
+            "description": "Identifica el aviso; se envía a `/sent` tras mandarlo.",
+            "title": "Key",
+            "type": "string"
+          },
+          "limit_eur": {
+            "title": "Limit Eur",
+            "type": "number"
+          },
+          "month": {
+            "description": "Primer día del mes (zona horaria de la atleta).",
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "integer"
+          },
+          "spent_eur": {
+            "title": "Spent Eur",
+            "type": "number"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "threshold": {
+            "description": "`warning`: umbral de aviso (80 % por defecto). `limit`: 100 %.",
+            "enum": [
+              "warning",
+              "limit"
+            ],
+            "title": "Threshold",
+            "type": "string"
+          },
+          "threshold_eur": {
+            "title": "Threshold Eur",
+            "type": "number"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "user_id",
+          "month",
+          "threshold",
+          "threshold_eur",
+          "spent_eur",
+          "limit_eur",
+          "percent",
+          "calls",
+          "by_model",
+          "subject",
+          "text"
+        ],
+        "title": "BudgetAlertOut",
+        "type": "object"
+      },
+      "BudgetAlertsOut": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/BudgetAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "alerts"
+        ],
+        "title": "BudgetAlertsOut",
+        "type": "object"
+      },
+      "BudgetAlertsSent": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "title": "BudgetAlertsSent",
+        "type": "object"
+      },
+      "BudgetAlertsSentOut": {
+        "properties": {
+          "ignored": {
+            "title": "Ignored",
+            "type": "integer"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recorded",
+          "ignored"
+        ],
+        "title": "BudgetAlertsSentOut",
+        "type": "object"
+      },
       "BudgetOut": {
-        "description": "Presupuesto mensual del LLM (todas las llamadas del mes, en euros).\n\n- `ok`: por debajo del aviso.\n- `warning`: se ha pasado el aviso (80 % por defecto); la app lo muestra a la atleta.\n- `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar\n  al LLM hasta el mes siguiente.",
+        "description": "Presupuesto mensual del LLM (todas las llamadas del mes, en euros).\n\n- `ok`: por debajo del aviso.\n- `warning`: se ha pasado el aviso (80 % por defecto). El aviso es para los\n  desarrolladores (#61, por n8n): la app no lo muestra a la atleta.\n- `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar\n  al LLM hasta el mes siguiente.",
         "examples": [
           {
             "limit_eur": 4.0,
@@ -2231,6 +2364,29 @@
         ],
         "title": "MessageRole",
         "type": "string"
+      },
+      "ModelUsageOut": {
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost_eur": {
+            "title": "Cost Eur",
+            "type": "number"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "calls",
+          "cost_eur"
+        ],
+        "title": "ModelUsageOut",
+        "type": "object"
       },
       "MuscleGroup": {
         "description": "Grupo muscular principal del ejercicio.",
@@ -5205,6 +5361,116 @@
         ]
       }
     },
+    "/internal/coach/budget-alerts": {
+      "get": {
+        "description": "Avisos de gasto del LLM pendientes (para n8n): umbrales del 80 % y del 100 % del límite\nmensual cruzados este mes y aún no enviados. Uno por atleta, mes y umbral.\n\nn8n envía cada aviso por email y después confirma el envío con `POST .../sent`; hasta\nentonces el aviso sigue apareciendo aquí.",
+        "operationId": "list_budget_alerts_internal_coach_budget_alerts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-internal-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAlertsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Budget Alerts",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
+    "/internal/coach/budget-alerts/sent": {
+      "post": {
+        "description": "Registra como enviados los avisos con esas claves, para no repetirlos.\n\nSólo se registran avisos pendientes: las claves ya registradas, de otro mes o de un umbral\nno cruzado se ignoran (`ignored`).",
+        "operationId": "mark_budget_alerts_sent_internal_coach_budget_alerts_sent_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-internal-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetAlertsSent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetAlertsSentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Budget Alerts Sent",
+        "tags": [
+          "internal"
+        ]
+      }
+    },
     "/internal/ping": {
       "get": {
         "description": "Permite a n8n comprobar que la API responde y que su clave es correcta.",
@@ -7750,7 +8016,7 @@
     },
     "/v1/coach/status": {
       "get": {
-        "description": "Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes\n(con el aviso del 80 %).",
+        "description": "Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes.\n\nLa app sólo usa `budget.state == exhausted` para saber si el coach puede responder; las\ncifras no se muestran a la atleta (los avisos de gasto van a los desarrolladores, #61).",
         "operationId": "get_status_v1_coach_status_get",
         "responses": {
           "200": {
