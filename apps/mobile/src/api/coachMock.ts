@@ -9,7 +9,8 @@
  * Flujo: la primera conversación es la toma de contacto; el coach abre con una o dos preguntas y,
  * tras la segunda respuesta de la atleta, cierra con un resumen y tres propuestas de memoria. Para
  * probar los errores: un mensaje con «error» responde 502 `coach_llm_error` (no se guarda) y uno
- * con «mareo» pasa por el filtro de seguridad.
+ * con «mareo» pasa por el filtro de seguridad y uno con «agotado» recibe la respuesta fija por
+ * presupuesto agotado (`origin = budget_limit`), que la app sustituye por un mensaje neutro.
  */
 import { contractExamples } from './contractExamples.generated';
 import { ApiError } from './errors';
@@ -92,6 +93,8 @@ const CHAT_REPLY =
 const SAFETY_REPLY =
   'Lo que describes puede necesitar una valoración médica. No entrenes hoy y consulta con un profesional sanitario; ' +
   'si los síntomas son intensos o empeoran, llama al 112.';
+
+const BUDGET_REPLY = 'Se ha alcanzado el presupuesto del mes. El coach volverá a responder el mes que viene.';
 
 const SAFETY_WORDS = /mareo|desmay|dolor (en el|de) pecho|torácic/i;
 
@@ -236,6 +239,10 @@ export const coachMock = {
     if (SAFETY_WORDS.test(content)) {
       const reply = addMessage(c, 'assistant', SAFETY_REPLY, 'safety_filter');
       return later({ user_message, reply, memory_proposals: [], budget }, 400);
+    }
+    if (/agotado/i.test(content)) {
+      const reply = addMessage(c, 'assistant', BUDGET_REPLY, 'budget_limit');
+      return later({ user_message, reply, memory_proposals: [], budget: { ...budget, state: 'exhausted' } }, 400);
     }
     const userTurns = c.messages.filter((m) => m.role === 'user').length;
     if (c.kind === 'intake' && !c.intake_completed_at) {

@@ -28,9 +28,14 @@ export function plainText(content: string): string {
   return content.replace(/^(\s*)[-*]\s+/gm, '$1• ').replace(/\*\*(.+?)\*\*/g, '$1');
 }
 
+/**
+ * Mensaje neutro cuando el coach no puede responder (sin proveedor o presupuesto agotado). El
+ * presupuesto es cosa de los desarrolladores: a la atleta no se le habla de euros ni de límites.
+ */
+export const COACH_UNAVAILABLE_TEXT = 'El coach no está disponible ahora mismo. Vuelve a intentarlo más tarde.';
+
 const ORIGIN_NOTES: Partial<Record<MessageOrigin, string>> = {
   safety_filter: 'Respuesta automática de seguridad',
-  budget_limit: 'Mensaje automático: presupuesto del mes agotado',
 };
 
 type ChatMessageProps = { role: 'user' | 'assistant'; content: string; origin?: MessageOrigin | null; children?: React.ReactNode };
@@ -47,11 +52,13 @@ export function ChatMessage({ role, content, origin, children }: ChatMessageProp
     );
   }
   const note = origin ? ORIGIN_NOTES[origin] : undefined;
+  // La respuesta fija por presupuesto agotado se sustituye por el mensaje neutro.
+  const text = origin === 'budget_limit' ? COACH_UNAVAILABLE_TEXT : plainText(content);
   return (
     <View style={styles.coach}>
       {note ? <Text style={styles.originNote}>{note}</Text> : null}
-      <Text style={styles.coachText} selectable accessibilityLabel={`Coach: ${content}`}>
-        {plainText(content)}
+      <Text style={styles.coachText} selectable accessibilityLabel={`Coach: ${text}`}>
+        {text}
       </Text>
       {children}
     </View>

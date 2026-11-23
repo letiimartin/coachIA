@@ -1,15 +1,15 @@
 /**
- * Memoria del coach y presupuesto (#56). El coach sólo PROPONE lo que recordar; la atleta lo
+ * Memoria del coach (#56). El coach sólo PROPONE lo que recordar; la atleta lo
  * confirma, lo corrige o lo descarta aquí, con los endpoints de memoria (nunca en el chat).
  */
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { BudgetOut, MemoryKind, MemoryOut } from '../api/types';
+import type { MemoryKind, MemoryOut } from '../api/types';
 import { Button, Chips, Field } from './components';
 import { formatDate } from './dates';
 import { MEMORY_KIND_LABELS, options } from './labels';
-import { colors, lines, radius, spacing, typography } from './theme';
+import { colors, lines, spacing, typography } from './theme';
 
 const KIND_OPTIONS = options(MEMORY_KIND_LABELS);
 
@@ -154,33 +154,6 @@ export function MemoryProposals({ items, onConfirm, onReject, onConfirmAll }: { 
   );
 }
 
-/** Primer día del mes siguiente al del presupuesto («1 de diciembre»). */
-function nextMonthLabel(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m, 1).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
-}
-
-const eur = (value: number) => `${value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-
-/**
- * Aviso del presupuesto mensual del LLM: a partir del aviso (80 %) y al llegar al límite. Las
- * cifras y el estado los da la API; aquí sólo se muestran.
- */
-export function BudgetNotice({ budget }: { budget: BudgetOut }) {
-  if (budget.state === 'ok') return null;
-  const exhausted = budget.state === 'exhausted';
-  return (
-    <View style={styles.budget} accessibilityRole="alert">
-      <Text style={styles.budgetTitle}>{exhausted ? 'Presupuesto del coach agotado' : 'Te acercas al límite mensual del coach'}</Text>
-      <Text style={styles.budgetText}>
-        {exhausted
-          ? `Este mes se han gastado ${eur(budget.spent_eur)} de ${eur(budget.limit_eur)}. Hasta el ${nextMonthLabel(budget.month)} el coach no puede responder; tu plan y tus datos siguen disponibles.`
-          : `Este mes llevas ${eur(budget.spent_eur)} de ${eur(budget.limit_eur)}. Al llegar al límite, el coach dejará de responder hasta el ${nextMonthLabel(budget.month)}.`}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   proposals: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: lines.hairline, borderTopColor: colors.separatorStrong, gap: spacing.xs },
   label: { ...typography.label, color: colors.textSecondary },
@@ -191,7 +164,4 @@ const styles = StyleSheet.create({
   meta: { ...typography.caption, color: colors.textSecondary },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md, paddingTop: spacing.xs },
   confirmAll: { flexDirection: 'row', paddingTop: spacing.xs },
-  budget: { backgroundColor: colors.warningSurface, borderRadius: radius.sm, padding: spacing.md, gap: spacing.xxs },
-  budgetTitle: { ...typography.smallBold, color: colors.warning },
-  budgetText: { ...typography.small, color: colors.warning },
 });

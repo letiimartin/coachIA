@@ -6,7 +6,9 @@
  * - Al enviar, «pensando» y después la respuesta completa (sin streaming). Si falla, el mensaje
  *   queda marcado con el error y se puede reintentar o editar (la API no lo guarda).
  * - Lo que el coach propone recordar se revisa bajo su mensaje: confirmar, corregir o descartar.
- * - Aviso del presupuesto al 80 % y mensaje claro al 100 % (los da la API en `budget.state`).
+ * - Si el coach no puede responder (sin proveedor, presupuesto agotado o respuesta fija por
+ *   presupuesto), sólo un mensaje neutro y la caja de texto deshabilitada. El presupuesto no se
+ *   muestra a la atleta: es cosa de los desarrolladores.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,8 +19,8 @@ import { coachApi } from '../../api/coachApi';
 import { ApiError, errorText } from '../../api/errors';
 import type { CoachStatusOut, ConversationKind, ConversationOut, MemoryKind, MemoryOut, MessageOut } from '../../api/types';
 import type { MainTabParamList } from '../../navigation/types';
-import { ChatDayLabel, ChatMessage, ComposeBar, FailedMessage, Suggestions, ThinkingRow, chatDayLabel, startsNewDay } from '../../ui/Chat';
-import { BudgetNotice, MemoryProposals } from '../../ui/CoachMemory';
+import { COACH_UNAVAILABLE_TEXT, ChatDayLabel, ChatMessage, ComposeBar, FailedMessage, Suggestions, ThinkingRow, chatDayLabel, startsNewDay } from '../../ui/Chat';
+import { MemoryProposals } from '../../ui/CoachMemory';
 import { Button, ErrorBanner, IconButton, Loading, MockBanner, styles as base } from '../../ui/components';
 import { Icon } from '../../ui/Icon';
 import { colors, spacing, typography } from '../../ui/theme';
@@ -234,9 +236,10 @@ export default function CoachChatScreen({ navigation, route }: Props) {
     void load('new');
   };
 
-  const available = status?.available ?? true;
-  const exhausted = status?.budget.state === 'exhausted';
   const chat = messages.filter(isChatMessage);
+  // Sin proveedor, con el presupuesto agotado o si la última respuesta es la fija por presupuesto.
+  const available =
+    (status?.available ?? true) && status?.budget.state !== 'exhausted' && chat[chat.length - 1]?.origin !== 'budget_limit';
   const attached = new Set(chat.map((m) => m.id));
   const loose = proposals.filter((p) => !p.source_message_id || !attached.has(p.source_message_id));
   const intakeDone = conversation?.kind === 'intake' && !!conversation.intake_completed_at;
@@ -277,12 +280,9 @@ export default function CoachChatScreen({ navigation, route }: Props) {
           <View style={[base.column, styles.content]}>
             <View style={styles.notices}>
               <MockBanner />
-              {status ? <BudgetNotice budget={status.budget} /> : null}
               {!available ? (
                 <View style={[base.banner, base.warning]} accessibilityRole="alert">
-                  <Text style={base.warningText}>
-                    El coach no está disponible ahora mismo: falta configurar su proveedor en el servidor. Tu plan y tus datos siguen disponibles.
-                  </Text>
+                  <Text style={base.warningText}>{COACH_UNAVAILABLE_TEXT}</Text>
                 </View>
               ) : null}
               <ErrorBanner message={error} onDismiss={() => setError(null)} />
@@ -304,7 +304,7 @@ export default function CoachChatScreen({ navigation, route }: Props) {
                 <Text style={[base.muted, styles.center]}>
                   Cuéntale cómo te encuentras o qué ha cambiado en tu agenda. Conoce tu plan, tu calendario y tus sensaciones.
                 </Text>
-                {!exhausted ? <Suggestions items={SUGGESTIONS} onPick={setDraft} /> : null}
+                <Suggestions items={SUGGESTIONS} onPick={setDraft} />
               </View>
             ) : null}
 
@@ -315,7 +315,7 @@ export default function CoachChatScreen({ navigation, route }: Props) {
                 <Text style={[base.muted, styles.center]}>
                   El coach empieza leyendo lo que ya sabe de ti y te hace una o dos preguntas cada vez.
                 </Text>
-                <Button title="Empezar la toma de contacto" onPress={() => void startIntake('intake')} disabled={exhausted} />
+                <Button title="Empezar la toma de contacto" onPress={() => void startIntake('intake')} />
               </View>
             ) : null}
 
@@ -362,11 +362,9 @@ export default function CoachChatScreen({ navigation, route }: Props) {
           value={draft}
           onChangeText={setDraft}
           onSend={onSend}
-          editable={available && !exhausted && !loadError}
+          editable={available && !loadError}
           busy={opening || pending?.error === null || (loading && chat.length === 0)}
-          placeholder={
-            !available ? 'El coach no está disponible' : exhausted ? 'Presupuesto del mes agotado' : 'Cuéntame qué ha cambiado…'
-          }
+          placeholder={available ? 'Cuéntame qué ha cambiado…' : 'El coach no está disponible'}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
