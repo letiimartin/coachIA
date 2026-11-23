@@ -27,7 +27,14 @@ from typing import Any
 from app.coach import prompts
 from app.coach.budget import call_cost_usd
 from app.coach.engine import run_turn
-from app.coach.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse, LLMUsage
+from app.coach.llm.base import (
+    ChatMessage,
+    LLMError,
+    LLMProvider,
+    LLMResponse,
+    LLMUsage,
+    ToolCall,
+)
 from app.coach.llm.fake import FakeProvider, FakeRequest
 from app.coach.safety import SAFETY_REPLY, check_message
 from app.coach.tools import TOOL_SPECS, MemoryProposal, dumps
@@ -65,7 +72,7 @@ def load_cases(path: Path = CASES_PATH) -> dict[str, Any]:
 
 
 def case_context(document: dict[str, Any], case: dict[str, Any]) -> dict[str, Any]:
-    context = copy.deepcopy(document["base_context"])
+    context: dict[str, Any] = copy.deepcopy(document["base_context"])
     context.update(copy.deepcopy(case.get("context", {})))
     return context
 
@@ -290,13 +297,8 @@ def run_case(
 # --- Informe ---------------------------------------------------------------------------------
 
 
-def _mean(values: Sequence[float | Decimal]) -> float:
-    return (
-        float(sum(values, Decimal(0)) if values and isinstance(values[0], Decimal) else sum(values))
-        / len(values)
-        if values
-        else 0.0
-    )  # type: ignore[arg-type]
+def _mean(values: Sequence[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
 
 
 def summary_rows(runs: Sequence[CaseRun], models: Sequence[str]) -> list[dict[str, Any]]:
@@ -342,8 +344,9 @@ def render_report(
         "",
         "## Resumen",
         "",
-        "| Modelo | Calidad | Chat | Propuestas | Errores | Tokens entrada/caso | Tokens salida/caso "
-        "| USD/mensaje chat | USD/propuesta | USD esta pasada | USD/mes estimado |",
+        "| Modelo | Calidad | Chat | Propuestas | Errores | Tokens entrada/caso "
+        "| Tokens salida/caso | USD/mensaje chat | USD/propuesta | USD esta pasada "
+        "| USD/mes estimado |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in summary_rows(runs, models):
@@ -385,13 +388,18 @@ def dry_run_provider() -> FakeProvider:
 
     def answer(request: FakeRequest) -> LLMResponse:
         if request.tools and not any(m.tool_results for m in request.messages):
-            from app.coach.llm.base import ToolCall
-
             name = request.tools[0].name
             return LLMResponse(
                 "", (ToolCall("dry", name, {}),), LLMUsage(800, 20), request.model, "tool_use"
             )
-        text = '{"action": "keep", "changes": [], "rationale": "simulado", "message_to_athlete": "Simulado."}'
+        text = json.dumps(
+            {
+                "action": "keep",
+                "changes": [],
+                "rationale": "simulado",
+                "message_to_athlete": "Simulado.",
+            }
+        )
         if "JSON" not in request.system:
             text = "Respuesta simulada. ¿Te encaja?"
         return LLMResponse(text, (), LLMUsage(1000, 60, 500, 0), request.model, "end_turn")

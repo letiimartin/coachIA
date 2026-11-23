@@ -48,7 +48,7 @@ select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "SIM"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["app", "scripts"]
+files = ["app", "scripts", "evals"]
 
 # fitdecode no publica tipos (sin py.typed).
 [[tool.mypy.overrides]]

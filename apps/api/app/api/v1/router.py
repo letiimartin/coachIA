@@ -10,6 +10,7 @@ from app.api.v1 import (
     integrations,
     me,
     strength,
+    strength_progress,
     threshold_proposals,
 )
 
@@ -22,4 +23,5 @@ api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(threshold_proposals.router)
 api_v1_router.include_router(strength.planned_router)
 api_v1_router.include_router(strength.router)
+api_v1_router.include_router(strength_progress.router)
 api_v1_router.include_router(coach.router)
