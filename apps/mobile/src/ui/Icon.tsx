@@ -33,6 +33,8 @@ import {
 import { CalendarX2, ExternalLink, HeartPulse, Plane, UserRound, Users } from 'lucide-react-native';
 // Entrenos planificados y sesión de fuerza (Fuerza 2, #31).
 import { Activity, Bike, Dumbbell, Footprints, History, Mountain, Square, SquareCheck, Waves } from 'lucide-react-native';
+// Coach conectado (#56): conversaciones, memoria, nueva conversación y corregir.
+import { BookUser, MessagesSquare, Pencil, SquarePen } from 'lucide-react-native';
 
 import { colors } from './theme';
 
@@ -76,6 +78,11 @@ const ICONS = {
   setPending: Square,
   setDone: SquareCheck,
   lastLog: History,
+  // Coach conectado (#56).
+  conversations: MessagesSquare,
+  coachMemory: BookUser,
+  newConversation: SquarePen,
+  edit: Pencil,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

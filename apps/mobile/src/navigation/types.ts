@@ -1,8 +1,11 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 import type { CalendarEventOut, ThresholdOut } from '../api/types';
 
 /** Pantallas del stack principal que reciben parámetros (las de pestañas no los usan). */
 export type RootStackParamList = {
-  MainTabs: undefined;
+  /** Pestañas; con `screen` se abre una concreta (p. ej. una conversación del coach). */
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Thresholds: undefined;
   ThresholdForm: { current: ThresholdOut | null };
   Availability: undefined;
@@ -16,13 +19,18 @@ export type RootStackParamList = {
   StrengthExercises: undefined;
   /** Progresión de un ejercicio (`exercises.id`); `name` sólo para el título mientras carga. */
   ExerciseProgress: { id: string; name?: string };
+  /** Conversaciones anteriores con el coach (#56). */
+  CoachConversations: undefined;
+  /** «Lo que el coach sabe de mí»: memoria confirmada y propuestas pendientes (#56). */
+  CoachMemory: undefined;
 };
 
 /** Las cinco pestañas (#23). Coach es una pestaña, no una pantalla de la pila. */
 export type MainTabParamList = {
   Hoy: undefined;
   Plan: undefined;
-  Coach: undefined;
+  /** `conversationId`: una conversación concreta o `new` (nueva, se crea al enviar el primer mensaje). */
+  Coach: { conversationId?: string } | undefined;
   Rendimiento: undefined;
   Perfil: undefined;
 };
