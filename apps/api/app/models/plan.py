@@ -6,7 +6,7 @@ entreno se hace, `activity_id` apunta a la actividad que lo cumplió.
 
 import enum
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
@@ -39,6 +39,14 @@ class PlannedWorkout(TimestampMixin, Base):
     coach_reason: Mapped[str | None] = mapped_column(sa.Text)
     # Duración planificada en segundos (#52). Null si no se ha definido: no se estima.
     planned_duration_s: Mapped[int | None]
+    # Por qué no se hizo, tal como lo explicó la atleta al coach (#55), cuándo y en qué mensaje.
+    # El coach lo lee para no volver a preguntarlo. SET NULL: borrar la conversación no borra
+    # el motivo.
+    missed_reason: Mapped[str | None] = mapped_column(sa.Text)
+    missed_reason_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    missed_reason_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), sa.ForeignKey("coach_messages.id", ondelete="SET NULL")
+    )
     # Actividad que lo cumplió. SET NULL: borrar la actividad no borra el plan.
     activity_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("activities.id", ondelete="SET NULL"), unique=True
@@ -50,5 +58,12 @@ class PlannedWorkout(TimestampMixin, Base):
         sa.CheckConstraint(
             "planned_duration_s IS NULL OR planned_duration_s BETWEEN 1 AND 86400",
             name="planned_duration_s",
+        ),
+        sa.CheckConstraint(
+            "(missed_reason IS NULL) = (missed_reason_at IS NULL)", name="missed_reason"
+        ),
+        sa.CheckConstraint(
+            "missed_reason IS NULL OR length(missed_reason) BETWEEN 1 AND 1000",
+            name="missed_reason_length",
         ),
     )

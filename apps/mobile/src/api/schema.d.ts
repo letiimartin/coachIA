@@ -414,6 +414,196 @@ export interface paths {
         patch: operations["update_event_v1_calendar_events__event_id__patch"];
         trace?: never;
     };
+    "/v1/coach/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description Conversaciones de la atleta, de la más reciente a la más antigua.
+         */
+        get: operations["list_conversations_v1_coach_conversations_get"];
+        put?: never;
+        /**
+         * Create Conversation
+         * @description Crea una conversación. La primera es la toma de contacto: el coach lee primero lo que
+         *     ya sabe de la atleta y abre la conversación con sus primeras preguntas (`opening`).
+         *
+         *     503 `coach_unavailable` si es una toma de contacto y no hay proveedor configurado; 502
+         *     `coach_llm_error` si el LLM falla al abrirla (la conversación queda creada, vacía).
+         */
+        post: operations["create_conversation_v1_coach_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation */
+        get: operations["get_conversation_v1_coach_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Messages
+         * @description Los últimos `limit` mensajes de la atleta y del coach, en orden. Los resultados de
+         *     herramientas se guardan para auditoría, pero no se devuelven.
+         */
+        get: operations["list_messages_v1_coach_conversations__conversation_id__messages_get"];
+        put?: never;
+        /**
+         * Send Message
+         * @description Envía un mensaje y devuelve la respuesta completa del coach.
+         *
+         *     - Si el mensaje habla de dolor torácico, mareo, desmayo o lesión aguda, la respuesta es
+         *       fija, recomienda una valoración médica y no llama al LLM (`origin = safety_filter`).
+         *     - Si el presupuesto del mes está agotado, la respuesta es fija (`origin = budget_limit`).
+         *     - `memory_proposals`: lo que el coach propone recordar; la atleta lo confirma aparte.
+         *
+         *     503 `coach_unavailable` si no hay proveedor (salvo el filtro de seguridad, que responde
+         *     igual). 502 `coach_llm_error` si el LLM falla: el mensaje no se guarda y se puede
+         *     reenviar.
+         */
+        post: operations["send_message_v1_coach_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Memory
+         * @description Memoria del coach. Con `status=proposed`, lo que el coach ha propuesto y está pendiente
+         *     de confirmar.
+         */
+        get: operations["list_memory_v1_coach_memory_get"];
+        put?: never;
+        /**
+         * Create Memory
+         * @description La atleta añade un objetivo o una preferencia: queda confirmado.
+         */
+        post: operations["create_memory_v1_coach_memory_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/memory/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Memory
+         * @description Borra un elemento de memoria: el coach deja de tenerlo en cuenta.
+         */
+        delete: operations["delete_memory_v1_coach_memory__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Memory
+         * @description Corrige un elemento confirmado. 409 si no está confirmado.
+         */
+        patch: operations["update_memory_v1_coach_memory__memory_id__patch"];
+        trace?: never;
+    };
+    "/v1/coach/memory/{memory_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Memory
+         * @description Confirma una propuesta del coach, con la corrección si se envía. 409 si no está
+         *     pendiente. Cuando no queda nada pendiente en una toma de contacto, queda hecha.
+         */
+        post: operations["confirm_memory_v1_coach_memory__memory_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/memory/{memory_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Memory
+         * @description Descarta una propuesta del coach. 409 si no está pendiente.
+         */
+        post: operations["reject_memory_v1_coach_memory__memory_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/coach/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Status
+         * @description Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes
+         *     (con el aviso del 80 %).
+         */
+        get: operations["get_status_v1_coach_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/integrations": {
         parameters: {
             query?: never;
@@ -839,6 +1029,41 @@ export interface components {
             weekday: number;
         };
         /**
+         * BudgetOut
+         * @description Presupuesto mensual del LLM (todas las llamadas del mes, en euros).
+         *
+         *     - `ok`: por debajo del aviso.
+         *     - `warning`: se ha pasado el aviso (80 % por defecto); la app lo muestra a la atleta.
+         *     - `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar
+         *       al LLM hasta el mes siguiente.
+         * @example {
+         *       "limit_eur": 4,
+         *       "month": "2026-11-01",
+         *       "spent_eur": 3.31,
+         *       "state": "warning",
+         *       "warning_eur": 3.2
+         *     }
+         */
+        BudgetOut: {
+            /** Limit Eur */
+            limit_eur: number;
+            /**
+             * Month
+             * Format: date
+             * @description Primer día del mes (zona horaria de la atleta).
+             */
+            month: string;
+            /** Spent Eur */
+            spent_eur: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "warning" | "exhausted";
+            /** Warning Eur */
+            warning_eur: number;
+        };
+        /**
          * CalendarEventCreate
          * @description Nuevo evento. Las fechas deben llevar zona horaria (ISO 8601 con desfase).
          *
@@ -993,11 +1218,94 @@ export interface components {
             training_impact?: components["schemas"]["TrainingImpact"] | null;
         };
         /**
+         * CoachReplyOut
+         * @description Resultado de un mensaje: el de la atleta, la respuesta completa del coach (sin
+         *     streaming), lo que el coach propone recordar (pendiente de confirmar) y el presupuesto.
+         */
+        CoachReplyOut: {
+            budget: components["schemas"]["BudgetOut"];
+            /** Memory Proposals */
+            memory_proposals: components["schemas"]["MemoryOut"][];
+            reply: components["schemas"]["MessageOut"];
+            /** @description Null cuando el coach abre la conversación. */
+            user_message: components["schemas"]["MessageOut"] | null;
+        };
+        /** CoachStatusOut */
+        CoachStatusOut: {
+            /**
+             * Available
+             * @description Hay un proveedor de LLM configurado.
+             */
+            available: boolean;
+            budget: components["schemas"]["BudgetOut"];
+            intake: components["schemas"]["IntakeOut"];
+            /**
+             * Model
+             * @description Modelo que conversa.
+             */
+            model: string;
+        };
+        /**
          * Comparison
          * @description Condición que cumple el valor medido frente al umbral cuando el criterio se cumple.
          * @enum {string}
          */
         Comparison: "gt" | "ge" | "lt" | "le";
+        /**
+         * ConversationChannel
+         * @enum {string}
+         */
+        ConversationChannel: "app";
+        /**
+         * ConversationCreate
+         * @description Sin `kind`, la conversación es una toma de contacto si aún no se ha hecho ninguna y,
+         *     si no, una conversación normal. `intake` repite la toma de contacto.
+         */
+        ConversationCreate: {
+            kind?: components["schemas"]["ConversationKind"] | null;
+        };
+        /** ConversationCreatedOut */
+        ConversationCreatedOut: {
+            conversation: components["schemas"]["ConversationOut"];
+            /** @description En la toma de contacto, el primer mensaje del coach. Null en las demás. */
+            opening: components["schemas"]["CoachReplyOut"] | null;
+        };
+        /**
+         * ConversationKind
+         * @enum {string}
+         */
+        ConversationKind: "intake" | "chat";
+        /** ConversationOut */
+        ConversationOut: {
+            channel: components["schemas"]["ConversationChannel"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Intake Completed At */
+            intake_completed_at: string | null;
+            kind: components["schemas"]["ConversationKind"];
+            /** Last Message At */
+            last_message_at: string | null;
+            /**
+             * Summary
+             * @description Resumen de los mensajes antiguos (lo mantiene el código).
+             */
+            summary: string | null;
+            /** Title */
+            title: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * CurrentThresholdOut
          * @description Umbral vigente en la fecha `on` (la fila más reciente con `effective_from <= on`).
@@ -1578,6 +1886,25 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * IntakeOut
+         * @description Toma de contacto: `not_started`, `in_progress` (la última sin terminar, también si se
+         *     repite) o `completed`. `completed_at`: la última vez que se terminó.
+         */
+        IntakeOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Conversation Id
+             * @description La última toma de contacto.
+             */
+            conversation_id: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "not_started" | "in_progress" | "completed";
+        };
+        /**
          * IntegrationOut
          * @description Estado de una integración. Nunca incluye tokens.
          */
@@ -1650,6 +1977,80 @@ export interface components {
          * @enum {string}
          */
         LoadMethod: "power" | "heart_rate" | "pace" | "rpe" | "session_rpe";
+        /**
+         * MemoryConfirm
+         * @description Confirma una propuesta, opcionalmente corregida.
+         */
+        MemoryConfirm: {
+            /** Content */
+            content?: string | null;
+            kind?: components["schemas"]["MemoryKind"] | null;
+        };
+        /** MemoryCreate */
+        MemoryCreate: {
+            /** Content */
+            content: string;
+            kind: components["schemas"]["MemoryKind"];
+        };
+        /**
+         * MemoryKind
+         * @enum {string}
+         */
+        MemoryKind: "goal" | "preference" | "other";
+        /**
+         * MemoryOut
+         * @description Elemento de memoria. `source`: `coach` (propuesto por el coach) o `athlete` (añadido por
+         *     ella). `status`: `proposed` (pendiente de confirmar), `confirmed`, `rejected` o
+         *     `superseded` (el coach lo sustituyó por otra propuesta). El origen es la conversación y
+         *     el mensaje del coach que lo propuso; `confirmed_at`, cuándo lo confirmó la atleta.
+         */
+        MemoryOut: {
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /** Content */
+            content: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["MemoryKind"];
+            source: components["schemas"]["MemorySource"];
+            /** Source Message Id */
+            source_message_id: string | null;
+            status: components["schemas"]["MemoryStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * MemoryPatch
+         * @description Corrige un elemento confirmado (sólo los campos enviados).
+         */
+        MemoryPatch: {
+            /** Content */
+            content?: string | null;
+            kind?: components["schemas"]["MemoryKind"] | null;
+        };
+        /**
+         * MemorySource
+         * @enum {string}
+         */
+        MemorySource: "coach" | "athlete";
+        /**
+         * MemoryStatus
+         * @enum {string}
+         */
+        MemoryStatus: "proposed" | "confirmed" | "rejected" | "superseded";
         /** MeResponse */
         MeResponse: {
             /** Email */
@@ -1660,6 +2061,60 @@ export interface components {
              */
             id: string;
         };
+        /**
+         * MessageCreate
+         * @example {
+         *       "content": "¿Qué hago hoy? Tengo una hora."
+         *     }
+         */
+        MessageCreate: {
+            /** Content */
+            content: string;
+        };
+        /**
+         * MessageOrigin
+         * @description De dónde sale un mensaje que no escribe la atleta.
+         * @enum {string}
+         */
+        MessageOrigin: "llm" | "safety_filter" | "budget_limit" | "tool";
+        /**
+         * MessageOut
+         * @description Mensaje de la atleta (`user`) o del coach (`assistant`).
+         *
+         *     `origin` (sólo en `assistant`): `llm`, `safety_filter` (respuesta fija del filtro de
+         *     seguridad, sin LLM) o `budget_limit` (respuesta fija por presupuesto agotado).
+         */
+        MessageOut: {
+            /** Content */
+            content: string;
+            /** Cost Eur */
+            cost_eur: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model */
+            model: string | null;
+            origin: components["schemas"]["MessageOrigin"] | null;
+            role: components["schemas"]["MessageRole"];
+            /** Seq */
+            seq: number;
+            /** Tokens In */
+            tokens_in: number | null;
+            /** Tokens Out */
+            tokens_out: number | null;
+        };
+        /**
+         * MessageRole
+         * @enum {string}
+         */
+        MessageRole: "user" | "assistant" | "tool" | "system";
         /**
          * MuscleGroup
          * @description Grupo muscular principal del ejercicio.
@@ -4264,6 +4719,726 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_conversations_v1_coach_conversations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_conversation_v1_coach_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationCreatedOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Un servicio externo no ha respondido correctamente. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Servicio no configurado. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_conversation_v1_coach_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_messages_v1_coach_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"][];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_message_v1_coach_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachReplyOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Un servicio externo no ha respondido correctamente. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Servicio no configurado. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_memory_v1_coach_memory_get: {
+        parameters: {
+            query?: {
+                /** @description Por defecto, sólo la memoria confirmada. */
+                status?: components["schemas"]["MemoryStatus"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"][];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_memory_v1_coach_memory_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_memory_v1_coach_memory__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_memory_v1_coach_memory__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicto con el estado actual. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_memory_v1_coach_memory__memory_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicto con el estado actual. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reject_memory_v1_coach_memory__memory_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Recurso no encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicto con el estado actual. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Endpoint declarado en el contrato pero todavía sin implementar. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_status_v1_coach_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachStatusOut"];
+                };
+            };
+            /** @description Falta el JWT o no es válido. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Endpoint declarado en el contrato pero todavía sin implementar. */

@@ -183,6 +183,56 @@
         "title": "AvailabilityDay",
         "type": "object"
       },
+      "BudgetOut": {
+        "description": "Presupuesto mensual del LLM (todas las llamadas del mes, en euros).\n\n- `ok`: por debajo del aviso.\n- `warning`: se ha pasado el aviso (80 % por defecto); la app lo muestra a la atleta.\n- `exhausted`: se ha llegado al límite; el coach responde con un mensaje fijo sin llamar\n  al LLM hasta el mes siguiente.",
+        "examples": [
+          {
+            "limit_eur": 4.0,
+            "month": "2026-11-01",
+            "spent_eur": 3.31,
+            "state": "warning",
+            "warning_eur": 3.2
+          }
+        ],
+        "properties": {
+          "limit_eur": {
+            "title": "Limit Eur",
+            "type": "number"
+          },
+          "month": {
+            "description": "Primer día del mes (zona horaria de la atleta).",
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "spent_eur": {
+            "title": "Spent Eur",
+            "type": "number"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warning",
+              "exhausted"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "warning_eur": {
+            "title": "Warning Eur",
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "spent_eur",
+          "limit_eur",
+          "warning_eur",
+          "state"
+        ],
+        "title": "BudgetOut",
+        "type": "object"
+      },
       "CalendarEventCreate": {
         "additionalProperties": false,
         "description": "Nuevo evento. Las fechas deben llevar zona horaria (ISO 8601 con desfase).\n\nSi `kind` es `race` y no se envía `race`, se crea la carrera con los valores por defecto.",
@@ -520,6 +570,71 @@
         "title": "CalendarEventPatch",
         "type": "object"
       },
+      "CoachReplyOut": {
+        "description": "Resultado de un mensaje: el de la atleta, la respuesta completa del coach (sin\nstreaming), lo que el coach propone recordar (pendiente de confirmar) y el presupuesto.",
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/BudgetOut"
+          },
+          "memory_proposals": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryOut"
+            },
+            "title": "Memory Proposals",
+            "type": "array"
+          },
+          "reply": {
+            "$ref": "#/components/schemas/MessageOut"
+          },
+          "user_message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null cuando el coach abre la conversación."
+          }
+        },
+        "required": [
+          "user_message",
+          "reply",
+          "memory_proposals",
+          "budget"
+        ],
+        "title": "CoachReplyOut",
+        "type": "object"
+      },
+      "CoachStatusOut": {
+        "properties": {
+          "available": {
+            "description": "Hay un proveedor de LLM configurado.",
+            "title": "Available",
+            "type": "boolean"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetOut"
+          },
+          "intake": {
+            "$ref": "#/components/schemas/IntakeOut"
+          },
+          "model": {
+            "description": "Modelo que conversa.",
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "model",
+          "intake",
+          "budget"
+        ],
+        "title": "CoachStatusOut",
+        "type": "object"
+      },
       "Comparison": {
         "description": "Condición que cumple el valor medido frente al umbral cuando el criterio se cumple.",
         "enum": [
@@ -530,6 +645,148 @@
         ],
         "title": "Comparison",
         "type": "string"
+      },
+      "ConversationChannel": {
+        "enum": [
+          "app"
+        ],
+        "title": "ConversationChannel",
+        "type": "string"
+      },
+      "ConversationCreate": {
+        "additionalProperties": false,
+        "description": "Sin `kind`, la conversación es una toma de contacto si aún no se ha hecho ninguna y,\nsi no, una conversación normal. `intake` repite la toma de contacto.",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ConversationCreate",
+        "type": "object"
+      },
+      "ConversationCreatedOut": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationOut"
+          },
+          "opening": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachReplyOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "En la toma de contacto, el primer mensaje del coach. Null en las demás."
+          }
+        },
+        "required": [
+          "conversation",
+          "opening"
+        ],
+        "title": "ConversationCreatedOut",
+        "type": "object"
+      },
+      "ConversationKind": {
+        "enum": [
+          "intake",
+          "chat"
+        ],
+        "title": "ConversationKind",
+        "type": "string"
+      },
+      "ConversationOut": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ConversationChannel"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intake_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intake Completed At"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resumen de los mensajes antiguos (lo mantiene el código).",
+            "title": "Summary"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "title",
+          "summary",
+          "last_message_at",
+          "intake_completed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationOut",
+        "type": "object"
       },
       "CurrentThresholdOut": {
         "description": "Umbral vigente en la fecha `on` (la fila más reciente con `effective_from <= on`).",
@@ -1363,6 +1620,52 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "IntakeOut": {
+        "description": "Toma de contacto: `not_started`, `in_progress` (la última sin terminar, también si se\nrepite) o `completed`. `completed_at`: la última vez que se terminó.",
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La última toma de contacto.",
+            "title": "Conversation Id"
+          },
+          "state": {
+            "enum": [
+              "not_started",
+              "in_progress",
+              "completed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "completed_at",
+          "conversation_id"
+        ],
+        "title": "IntakeOut",
+        "type": "object"
+      },
       "IntegrationOut": {
         "description": "Estado de una integración. Nunca incluye tokens.",
         "properties": {
@@ -1600,6 +1903,334 @@
         ],
         "title": "MeResponse",
         "type": "object"
+      },
+      "MemoryConfirm": {
+        "additionalProperties": false,
+        "description": "Confirma una propuesta, opcionalmente corregida.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "MemoryConfirm",
+        "type": "object"
+      },
+      "MemoryCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MemoryKind"
+          }
+        },
+        "required": [
+          "kind",
+          "content"
+        ],
+        "title": "MemoryCreate",
+        "type": "object"
+      },
+      "MemoryKind": {
+        "enum": [
+          "goal",
+          "preference",
+          "other"
+        ],
+        "title": "MemoryKind",
+        "type": "string"
+      },
+      "MemoryOut": {
+        "description": "Elemento de memoria. `source`: `coach` (propuesto por el coach) o `athlete` (añadido por\nella). `status`: `proposed` (pendiente de confirmar), `confirmed`, `rejected` o\n`superseded` (el coach lo sustituyó por otra propuesta). El origen es la conversación y\nel mensaje del coach que lo propuso; `confirmed_at`, cuándo lo confirmó la atleta.",
+        "properties": {
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MemoryKind"
+          },
+          "source": {
+            "$ref": "#/components/schemas/MemorySource"
+          },
+          "source_message_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Message Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "content",
+          "status",
+          "source",
+          "conversation_id",
+          "source_message_id",
+          "confirmed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MemoryOut",
+        "type": "object"
+      },
+      "MemoryPatch": {
+        "additionalProperties": false,
+        "description": "Corrige un elemento confirmado (sólo los campos enviados).",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "MemoryPatch",
+        "type": "object"
+      },
+      "MemorySource": {
+        "enum": [
+          "coach",
+          "athlete"
+        ],
+        "title": "MemorySource",
+        "type": "string"
+      },
+      "MemoryStatus": {
+        "enum": [
+          "proposed",
+          "confirmed",
+          "rejected",
+          "superseded"
+        ],
+        "title": "MemoryStatus",
+        "type": "string"
+      },
+      "MessageCreate": {
+        "additionalProperties": false,
+        "examples": [
+          {
+            "content": "¿Qué hago hoy? Tengo una hora."
+          }
+        ],
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "MessageCreate",
+        "type": "object"
+      },
+      "MessageOrigin": {
+        "description": "De dónde sale un mensaje que no escribe la atleta.",
+        "enum": [
+          "llm",
+          "safety_filter",
+          "budget_limit",
+          "tool"
+        ],
+        "title": "MessageOrigin",
+        "type": "string"
+      },
+      "MessageOut": {
+        "description": "Mensaje de la atleta (`user`) o del coach (`assistant`).\n\n`origin` (sólo en `assistant`): `llm`, `safety_filter` (respuesta fija del filtro de\nseguridad, sin LLM) o `budget_limit` (respuesta fija por presupuesto agotado).",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "cost_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Eur"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "tokens_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Out"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "role",
+          "origin",
+          "content",
+          "model",
+          "tokens_in",
+          "tokens_out",
+          "cost_eur",
+          "created_at"
+        ],
+        "title": "MessageOut",
+        "type": "object"
+      },
+      "MessageRole": {
+        "enum": [
+          "user",
+          "assistant",
+          "tool",
+          "system"
+        ],
+        "title": "MessageRole",
+        "type": "string"
       },
       "MuscleGroup": {
         "description": "Grupo muscular principal del ejercicio.",
@@ -6170,6 +6801,997 @@
         "summary": "Update Event",
         "tags": [
           "calendar"
+        ]
+      }
+    },
+    "/v1/coach/conversations": {
+      "get": {
+        "description": "Conversaciones de la atleta, de la más reciente a la más antigua.",
+        "operationId": "list_conversations_v1_coach_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationOut"
+                  },
+                  "title": "Response List Conversations V1 Coach Conversations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Conversations",
+        "tags": [
+          "coach"
+        ]
+      },
+      "post": {
+        "description": "Crea una conversación. La primera es la toma de contacto: el coach lee primero lo que\nya sabe de la atleta y abre la conversación con sus primeras preguntas (`opening`).\n\n503 `coach_unavailable` si es una toma de contacto y no hay proveedor configurado; 502\n`coach_llm_error` si el LLM falla al abrirla (la conversación queda creada, vacía).",
+        "operationId": "create_conversation_v1_coach_conversations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Un servicio externo no ha respondido correctamente."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Servicio no configurado."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Conversation",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/conversations/{conversation_id}": {
+      "get": {
+        "operationId": "get_conversation_v1_coach_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Conversation",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/conversations/{conversation_id}/messages": {
+      "get": {
+        "description": "Los últimos `limit` mensajes de la atleta y del coach, en orden. Los resultados de\nherramientas se guardan para auditoría, pero no se devuelven.",
+        "operationId": "list_messages_v1_coach_conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MessageOut"
+                  },
+                  "title": "Response List Messages V1 Coach Conversations  Conversation Id  Messages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Messages",
+        "tags": [
+          "coach"
+        ]
+      },
+      "post": {
+        "description": "Envía un mensaje y devuelve la respuesta completa del coach.\n\n- Si el mensaje habla de dolor torácico, mareo, desmayo o lesión aguda, la respuesta es\n  fija, recomienda una valoración médica y no llama al LLM (`origin = safety_filter`).\n- Si el presupuesto del mes está agotado, la respuesta es fija (`origin = budget_limit`).\n- `memory_proposals`: lo que el coach propone recordar; la atleta lo confirma aparte.\n\n503 `coach_unavailable` si no hay proveedor (salvo el filtro de seguridad, que responde\nigual). 502 `coach_llm_error` si el LLM falla: el mensaje no se guarda y se puede\nreenviar.",
+        "operationId": "send_message_v1_coach_conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachReplyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Un servicio externo no ha respondido correctamente."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Servicio no configurado."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Message",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/memory": {
+      "get": {
+        "description": "Memoria del coach. Con `status=proposed`, lo que el coach ha propuesto y está pendiente\nde confirmar.",
+        "operationId": "list_memory_v1_coach_memory_get",
+        "parameters": [
+          {
+            "description": "Por defecto, sólo la memoria confirmada.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MemoryStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "confirmed",
+              "description": "Por defecto, sólo la memoria confirmada.",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MemoryOut"
+                  },
+                  "title": "Response List Memory V1 Coach Memory Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Memory",
+        "tags": [
+          "coach"
+        ]
+      },
+      "post": {
+        "description": "La atleta añade un objetivo o una preferencia: queda confirmado.",
+        "operationId": "create_memory_v1_coach_memory_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Memory",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/memory/{memory_id}": {
+      "delete": {
+        "description": "Borra un elemento de memoria: el coach deja de tenerlo en cuenta.",
+        "operationId": "delete_memory_v1_coach_memory__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Memory",
+        "tags": [
+          "coach"
+        ]
+      },
+      "patch": {
+        "description": "Corrige un elemento confirmado. 409 si no está confirmado.",
+        "operationId": "update_memory_v1_coach_memory__memory_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Memory",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/memory/{memory_id}/confirm": {
+      "post": {
+        "description": "Confirma una propuesta del coach, con la corrección si se envía. 409 si no está\npendiente. Cuando no queda nada pendiente en una toma de contacto, queda hecha.",
+        "operationId": "confirm_memory_v1_coach_memory__memory_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Memory",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/memory/{memory_id}/reject": {
+      "post": {
+        "description": "Descarta una propuesta del coach. 409 si no está pendiente.",
+        "operationId": "reject_memory_v1_coach_memory__memory_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Recurso no encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicto con el estado actual."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reject Memory",
+        "tags": [
+          "coach"
+        ]
+      }
+    },
+    "/v1/coach/status": {
+      "get": {
+        "description": "Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes\n(con el aviso del 80 %).",
+        "operationId": "get_status_v1_coach_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falta el JWT o no es válido."
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Endpoint declarado en el contrato pero todavía sin implementar."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Status",
+        "tags": [
+          "coach"
         ]
       }
     },

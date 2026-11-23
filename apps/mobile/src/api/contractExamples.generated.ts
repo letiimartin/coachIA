@@ -25,6 +25,15 @@ export const contractExamples: Record<string, unknown[]> = {
       ]
     }
   ],
+  "BudgetOut": [
+    {
+      "limit_eur": 4,
+      "month": "2026-11-01",
+      "spent_eur": 3.31,
+      "state": "warning",
+      "warning_eur": 3.2
+    }
+  ],
   "CalendarEventCreate": [
     {
       "all_day": false,
@@ -454,6 +463,11 @@ export const contractExamples: Record<string, unknown[]> = {
       ],
       "from": "2026-11-10",
       "to": "2026-11-12"
+    }
+  ],
+  "MessageCreate": [
+    {
+      "content": "¿Qué hago hoy? Tengo una hora."
     }
   ],
   "PerformedExerciseOut": [
