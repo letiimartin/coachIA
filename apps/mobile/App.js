@@ -27,6 +27,8 @@ import EventDetailScreen from './src/screens/calendar/EventDetailScreen';
 import DashboardScreen from './src/screens/home/DashboardScreen';
 import PerformanceScreen from './src/screens/performance/PerformanceScreen';
 import CoachChatScreen from './src/screens/coach/CoachChatScreen';
+import CoachConversationsScreen from './src/screens/coach/CoachConversationsScreen';
+import CoachMemoryScreen from './src/screens/coach/CoachMemoryScreen';
 import IntegrationsScreen from './src/screens/integrations/IntegrationsScreen';
 import StrengthSessionScreen from './src/screens/strength/StrengthSessionScreen';
 import StrengthExercisesScreen from './src/screens/performance/StrengthExercisesScreen';
@@ -59,6 +61,8 @@ const linking = {
       StrengthSession: 'plan/strength/:id',
       StrengthExercises: 'performance/strength',
       ExerciseProgress: 'performance/strength/:id',
+      CoachConversations: 'coach/conversations',
+      CoachMemory: 'coach/memory',
     },
   },
 };
@@ -196,6 +200,8 @@ export default function App() {
             <Stack.Screen name="StrengthSession" component={StrengthSessionScreen} />
             <Stack.Screen name="StrengthExercises" component={StrengthExercisesScreen} />
             <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
+            <Stack.Screen name="CoachConversations" component={CoachConversationsScreen} />
+            <Stack.Screen name="CoachMemory" component={CoachMemoryScreen} />
           </Stack.Navigator>
         ) : (
           <AuthScreen onLogin={() => { }} />

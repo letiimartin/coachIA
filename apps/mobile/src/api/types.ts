@@ -59,3 +59,20 @@ export type StrengthWeekOut = S['StrengthWeekOut'];
 export type PerformedExerciseOut = S['PerformedExerciseOut'];
 export type ExerciseProgressOut = S['ExerciseProgressOut'];
 export type ExerciseSessionOut = S['ExerciseSessionOut'];
+
+// Coach v1 (contrato de #55).
+export type CoachStatusOut = S['CoachStatusOut'];
+export type BudgetOut = S['BudgetOut'];
+export type IntakeOut = S['IntakeOut'];
+export type ConversationOut = S['ConversationOut'];
+export type ConversationKind = S['ConversationKind'];
+export type ConversationCreatedOut = S['ConversationCreatedOut'];
+export type CoachReplyOut = S['CoachReplyOut'];
+export type MessageOut = S['MessageOut'];
+export type MessageOrigin = S['MessageOrigin'];
+export type MemoryOut = S['MemoryOut'];
+export type MemoryKind = S['MemoryKind'];
+export type MemoryStatus = S['MemoryStatus'];
+export type MemoryCreate = S['MemoryCreate'];
+export type MemoryConfirm = S['MemoryConfirm'];
+export type MemoryPatch = S['MemoryPatch'];

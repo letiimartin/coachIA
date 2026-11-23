@@ -2,6 +2,7 @@
 import type {
   EnrichmentStatus,
   EventKind,
+  MemoryKind,
   PreferredTime,
   RaceDiscipline,
   RacePriority,
@@ -71,6 +72,9 @@ export const ENRICHMENT_STATUS_LABELS: Record<EnrichmentStatus, string> = {
   pending_review: 'Completada automáticamente, pendiente de revisar',
   confirmed: 'Confirmada',
 };
+
+/** Tipos de memoria del coach (#56). */
+export const MEMORY_KIND_LABELS: Record<MemoryKind, string> = { goal: 'Objetivo', preference: 'Preferencia', other: 'Otro' };
 
 export function options<T extends string>(labels: Record<T, string>): { value: T; label: string }[] {
   return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
