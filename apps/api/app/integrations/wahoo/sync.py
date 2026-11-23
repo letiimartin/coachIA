@@ -4,6 +4,9 @@
 - Sólo importa workouts con resumen (los realizados); los planificados no tienen resumen.
 - Upsert por (user_id, source='wahoo', external_id=id del workout). Una fila existente sólo se
   reescribe si cambia la respuesta de Wahoo (`raw`), así que repetir el sync no modifica nada.
+- La primera sincronización (sin cursor) sólo importa los workouts que empezaron en los últimos
+  `initial_sync_days` días (`WAHOO_INITIAL_SYNC_DAYS`, 183 por defecto: unos 6 meses). Como el
+  listado viene ordenado por inicio descendente, basta con parar la paginación.
 - `integrations.sync_cursor` guarda el inicio más reciente importado. Los syncs siguientes paran
   al llegar a workouts que empezaron antes de ese inicio menos un margen (`INCREMENTAL_OVERLAP`),
   para recoger también workouts subidos o editados con retraso.
@@ -77,9 +80,17 @@ def _now() -> datetime:
 
 
 def sync_user(
-    session: Session, cipher: TokenCipher, client: WahooClient, user_id: uuid.UUID
+    session: Session,
+    cipher: TokenCipher,
+    client: WahooClient,
+    user_id: uuid.UUID,
+    *,
+    initial_sync_days: int,
 ) -> SyncResult:
     """Importa los workouts de Wahoo del usuario.
+
+    Sin cursor (primera sincronización) sólo importa los de los últimos `initial_sync_days` días;
+    con cursor, los posteriores al último inicio conocido menos `INCREMENTAL_OVERLAP`.
 
     Lanza service.WahooNotConnectedError si no hay integración utilizable y las excepciones de
     WahooApiError si Wahoo falla (tras dejar la integración en el estado que corresponde).
@@ -90,7 +101,10 @@ def sync_user(
         raise service.WahooNotConnectedError()
 
     previous_latest = _parse_cursor(integration.sync_cursor)
-    stop_before = previous_latest - INCREMENTAL_OVERLAP if previous_latest else None
+    if previous_latest is not None:
+        stop_before = previous_latest - INCREMENTAL_OVERLAP
+    else:
+        stop_before = _now() - timedelta(days=initial_sync_days)
     result = SyncResult()
     latest = previous_latest
     earliest_changed: datetime | None = None
@@ -102,7 +116,7 @@ def sync_user(
             reached_known = False
             for workout in workouts_page.workouts:
                 starts = parse_datetime(workout.get("starts"))
-                if stop_before is not None and starts is not None and starts < stop_before:
+                if starts is not None and starts < stop_before:
                     reached_known = True
                     break
                 summary = _summary_for(client, access_token, workout)
@@ -158,7 +172,9 @@ def sync_user(
     return result
 
 
-def sync_all(session: Session, cipher: TokenCipher, client: WahooClient) -> SyncAllResult:
+def sync_all(
+    session: Session, cipher: TokenCipher, client: WahooClient, *, initial_sync_days: int
+) -> SyncAllResult:
     """Sincroniza todas las integraciones de Wahoo activas (para la automatización de n8n).
 
     Un fallo de un usuario no detiene a los demás, salvo el límite de peticiones (429), que es
@@ -175,7 +191,9 @@ def sync_all(session: Session, cipher: TokenCipher, client: WahooClient) -> Sync
     outcome = SyncAllResult(integrations=len(user_ids))
     for user_id in user_ids:
         try:
-            result = sync_user(session, cipher, client, user_id)
+            result = sync_user(
+                session, cipher, client, user_id, initial_sync_days=initial_sync_days
+            )
         except WahooRateLimitError:
             outcome.failed += 1
             outcome.rate_limited = True

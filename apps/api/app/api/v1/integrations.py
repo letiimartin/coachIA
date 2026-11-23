@@ -6,7 +6,14 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, DbSession, StateSignerDep, TokenCipherDep, WahooClientDep
+from app.api.deps import (
+    CurrentUser,
+    DbSession,
+    SettingsDep,
+    StateSignerDep,
+    TokenCipherDep,
+    WahooClientDep,
+)
 from app.core.errors import (
     BadGatewayError,
     ConflictError,
@@ -90,11 +97,18 @@ def disconnect_wahoo(user: CurrentUser, db: DbSession) -> Response:
 
 @router.post("/wahoo/sync")
 def sync_wahoo(
-    user: CurrentUser, db: DbSession, cipher: TokenCipherDep, client: WahooClientDep
+    user: CurrentUser,
+    db: DbSession,
+    cipher: TokenCipherDep,
+    client: WahooClientDep,
+    settings: SettingsDep,
 ) -> SyncOut:
     """Importa las actividades realizadas en Wahoo. Es idempotente: se puede repetir sin riesgo."""
+    # La primera vez sólo trae los últimos WAHOO_INITIAL_SYNC_DAYS días (unos 6 meses, #63).
     try:
-        result = wahoo_sync.sync_user(db, cipher, client, user.id)
+        result = wahoo_sync.sync_user(
+            db, cipher, client, user.id, initial_sync_days=settings.wahoo_initial_sync_days
+        )
     except (wahoo_service.WahooNotConnectedError, WahooUnauthorizedError) as exc:
         raise ConflictError("Wahoo no está conectado o hay que volver a conectarlo.") from exc
     except WahooRateLimitError as exc:
