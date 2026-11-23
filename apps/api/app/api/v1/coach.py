@@ -50,8 +50,10 @@ def _reply_out(outcome: TurnOutcome) -> CoachReplyOut:
 def get_status(
     user: CurrentUser, db: DbSession, settings: SettingsDep, provider: LlmProviderDep
 ) -> CoachStatusOut:
-    """Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes
-    (con el aviso del 80 %)."""
+    """Si el coach está disponible, el estado de la toma de contacto y el presupuesto del mes.
+
+    La app sólo usa `budget.state == exhausted` para saber si el coach puede responder; las
+    cifras no se muestran a la atleta (los avisos de gasto van a los desarrolladores, #61)."""
     ensure_athlete_profile(db, user.id)
     intake = orchestrator.intake_status(db, user.id)
     return CoachStatusOut(

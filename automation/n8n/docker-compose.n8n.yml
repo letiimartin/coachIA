@@ -20,6 +20,10 @@ services:
     environment:
       # URL base de la API que llaman los workflows ({{ $env.API_BASE_URL }}). Por defecto, la API local.
       API_BASE_URL: ${API_BASE_URL:-http://host.docker.internal:8000}
+      # Direcciones del aviso de gasto del LLM (workflow budget-alerts.json). Vacías por defecto:
+      # se definen en .env, nunca en el repositorio.
+      COACH_ALERTS_EMAIL_FROM: ${COACH_ALERTS_EMAIL_FROM:-}
+      COACH_ALERTS_EMAIL_TO: ${COACH_ALERTS_EMAIL_TO:-}
       # Los workflows leen API_BASE_URL con $env; n8n 2.x lo bloquea por defecto.
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       # Cifra las credenciales guardadas en el volumen. Obligatoria (no tiene valor por defecto).
