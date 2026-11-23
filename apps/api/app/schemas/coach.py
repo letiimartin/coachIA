@@ -210,7 +210,7 @@ class MemoryPatch(BaseModel):
 def budget_out(status: "BudgetStatus") -> BudgetOut:
     return BudgetOut(
         month=status.month,
-        spent_eur=round(float(status.spent_eur), 4),
+        spent_eur=round(float(status.spent_eur), 6),
         limit_eur=float(status.limit_eur),
         warning_eur=float(status.warning_eur),
         state=status.state.value,
